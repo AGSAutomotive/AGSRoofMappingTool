@@ -104,5 +104,7 @@ with col1:
     # Passing the width property here allows visual zooming while coordinates stay fixed to baseline dimensions
     clicked_coords = streamlit_image_coordinates(
         left_display,
+    
         width=LEFT_ZOOM_WIDTH,
         key=f"image_click_{plant}"
+    )
