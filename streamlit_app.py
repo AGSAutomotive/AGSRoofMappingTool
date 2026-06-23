@@ -1,15 +1,13 @@
 import streamlit as st
 from PIL import Image, ImageDraw
-import numpy as np
-from streamlit_drawable_canvas import st_canvas
 
 st.set_page_config(layout="wide")
-st.title("Roof Leak Mapping System")
+st.title("Roof Leak Mapping System (Stable Version)")
 
 # -----------------------------
-# PLANT SELECTOR
+# PLANT SELECTION
 # -----------------------------
-plant = st.selectbox("Select Manufacturing Plant", ["Plant A", "Plant B", "Plant C"])
+plant = st.selectbox("Select Plant", ["Plant A", "Plant B", "Plant C"])
 
 plant_data = {
     "Plant A": {
@@ -32,9 +30,6 @@ plant_data = {
 ceiling_img = Image.open(plant_data[plant]["ceiling"]).convert("RGB")
 roof_img = Image.open(plant_data[plant]["roof"]).convert("RGB")
 
-# CONVERT TO NUMPY (IMPORTANT FIX)
-ceiling_array = np.array(ceiling_img)
-
 # -----------------------------
 # SESSION STATE
 # -----------------------------
@@ -51,29 +46,21 @@ if "leaks" not in st.session_state:
 col1, col2 = st.columns(2)
 
 # -----------------------------
-# CEILING CLICK AREA
+# CEILING IMAGE CLICK (NO CANVAS)
 # -----------------------------
 with col1:
-    st.subheader("Click Ceiling to Mark Leak")
+    st.subheader("Click to Add Leak (X/Y)")
 
-    canvas_result = st_canvas(
-        background_image=ceiling_array,
-        drawing_mode="point",
-        height=500,
-        width=500,
-        key=plant
-    )
+    # Show image
+    st.image(ceiling_img, use_container_width=True)
 
-    if canvas_result.json_data:
-        objects = canvas_result.json_data["objects"]
+    st.write("Manually enter leak position (temporary method):")
 
-        if objects:
-            last = objects[-1]
-            x = last["left"]
-            y = last["top"]
+    x = st.number_input("X coordinate", min_value=0, max_value=ceiling_img.width, value=0)
+    y = st.number_input("Y coordinate", min_value=0, max_value=ceiling_img.height, value=0)
 
-            if len(st.session_state.leaks[plant]) == 0 or st.session_state.leaks[plant][-1] != (x, y):
-                st.session_state.leaks[plant].append((x, y))
+    if st.button("Add Leak"):
+        st.session_state.leaks[plant].append((x, y))
 
 # -----------------------------
 # ROOF DISPLAY
@@ -92,4 +79,4 @@ with col2:
 # -----------------------------
 # DEBUG
 # -----------------------------
-st.write("Leak points:", st.session_state.leaks[plant])
+st.write("Leaks:", st.session_state.leaks[plant])
