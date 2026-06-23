@@ -1,6 +1,8 @@
 import streamlit as st
 from streamlit_drawable_canvas import st_canvas
 from PIL import Image, ImageDraw
+import io
+import base64
 
 # Set up page layout
 st.set_page_config(page_title="AGS Roof Leak Mapper", layout="wide")
@@ -21,9 +23,16 @@ else:
     left_path = "data/Desk (under roof).jpg"
     right_path = "data/Office Ceiling (Roof).jpg"
 
+# Helper function to convert PIL Image to Base64 Data URL string
+def get_image_base64_url(pil_img):
+    buffered = io.BytesIO()
+    # Save as JPEG to keep memory footprint light
+    pil_img.save(buffered, format="JPEG")
+    img_str = base64.b64encode(buffered.getvalue()).decode()
+    return f"data:image/jpeg;base64,{img_str}"
+
 # 2. Safely Load, Convert, and Resize Images
 try:
-    # .convert("RGB") ensures the canvas can read the pixel data flawlessly
     left_img = Image.open(left_path).convert("RGB")
     right_img = Image.open(right_path).convert("RGB")
     
@@ -38,6 +47,9 @@ try:
     # Resize both for clean parallel canvas layout
     left_resized = left_img.resize((DISPLAY_WIDTH, display_height))
     right_resized = right_img.resize((DISPLAY_WIDTH, display_height))
+    
+    # Convert left image to base64 string to force-bypass Streamlit's asset server path bugs
+    left_base64_url = get_image_base64_url(left_resized)
 
 except FileNotFoundError:
     st.error("⚠️ Could not find the image files in the 'data/' folder. Please ensure 'Office Ceiling (Roof).jpg' and 'Desk (under roof).jpg' exist inside your repository.")
@@ -47,20 +59,20 @@ except FileNotFoundError:
 col1, col2 = st.columns(2)
 
 with col1:
-    st.subheader("📸 Primary Map View (Click Here)")
+    st.subheader("📸 Floor Map View (Click Here)")
     
-    # Interactive clickable canvas layer
+    # Interactive clickable canvas layer using the secure base64 data string
     canvas_result = st_canvas(
         fill_color="rgba(255, 0, 0, 0.3)",  # semi-transparent red
         stroke_width=3,
         stroke_color="#FF0000",
-        background_image=left_resized,
+        background_image=left_base64_url, # Fed directly via data string instead of PIL Object
         update_streamlit=True,
         height=display_height,
         width=DISPLAY_WIDTH,
         drawing_mode="point", # simple dot click mapping
         point_display_radius=6,
-        key=f"canvas_{plant}_swapped" # New unique key forces a clean component refresh
+        key=f"canvas_{plant}_b64" # New unique key forces component refresh
     )
 
 with col2:
