@@ -1,16 +1,16 @@
 import streamlit as st
-from streamlit_drawable_canvas import st_canvas
+from streamlit_image_coordinates import streamlit_image_coordinates
 from PIL import Image, ImageDraw
 
 # Set up page layout
 st.set_page_config(page_title="AGS Roof Leak Mapper", layout="wide")
 st.title("🏭 AGS Roof Leak Mapping Tool")
-st.write("Click anywhere on the map on the left to mark a leak. The corresponding location will automatically calculate and display on the right view.")
+st.write("Click anywhere on the map on the left. The corresponding location will automatically calculate and display on the right.")
 
-# 1. Plant Selection Configuration
+# 1. Plant Selection
 plant = st.selectbox("Select Manufacturing Plant:", ["Plant 1", "Plant 2", "Plant 3"])
 
-# Swapped paths so the Desk is now the interactive image on the left
+# Image pathways (Desk on left, Ceiling on right)
 if plant == "Plant 1":
     left_path = "data/Desk (under roof).jpg"
     right_path = "data/Office Ceiling (Roof).jpg"
@@ -21,63 +21,51 @@ else:
     left_path = "data/Desk (under roof).jpg"
     right_path = "data/Office Ceiling (Roof).jpg"
 
-# 2. Safely Load, Convert, and Resize Images
+# 2. Safely Load and Resize Images
 try:
-    # .convert("RGB") ensures the canvas can read the pixel data flawlessly
     left_img = Image.open(left_path).convert("RGB")
     right_img = Image.open(right_path).convert("RGB")
     
-    # Fix a display width to prevent any image cutting off or misalignment
+    # Standardize widths so the coordinates translate perfectly 1:1
     DISPLAY_WIDTH = 600
     
-    # Calculate aspect ratio based scaling
-    l_width, l_height = left_img.size
-    scale_ratio = DISPLAY_WIDTH / float(l_width)
-    display_height = int(float(l_height) * float(scale_ratio))
+    ratio_left = DISPLAY_WIDTH / left_img.width
+    height_left = int(left_img.height * ratio_left)
+    left_resized = left_img.resize((DISPLAY_WIDTH, height_left))
     
-    # Resize both for clean parallel canvas layout
-    left_resized = left_img.resize((DISPLAY_WIDTH, display_height))
-    right_resized = right_img.resize((DISPLAY_WIDTH, display_height))
+    ratio_right = DISPLAY_WIDTH / right_img.width
+    height_right = int(right_img.height * ratio_right)
+    right_resized = right_img.resize((DISPLAY_WIDTH, height_right))
 
 except FileNotFoundError:
-    st.error("⚠️ Could not find the image files in the 'data/' folder. Please ensure 'Office Ceiling (Roof).jpg' and 'Desk (under roof).jpg' exist inside your repository.")
+    st.error("⚠️ Could not find the image files. Please ensure 'Office Ceiling (Roof).jpg' and 'Desk (under roof).jpg' exist inside the 'data/' folder.")
     st.stop()
 
-# 3. Create Side-by-Side App Interface
+# 3. Create Side-by-Side UI
 col1, col2 = st.columns(2)
 
 with col1:
-    st.subheader("📸 Primary Map View (Click Here)")
+    st.subheader("📸 Primary Map (Click Here)")
     
-    # Interactive clickable canvas layer
-    canvas_result = st_canvas(
-        fill_color="rgba(255, 0, 0, 0.3)",  # semi-transparent red
-        stroke_width=3,
-        stroke_color="#FF0000",
-        background_image=left_resized,
-        update_streamlit=True,
-        height=display_height,
-        width=DISPLAY_WIDTH,
-        drawing_mode="point", # simple dot click mapping
-        point_display_radius=6,
-        key=f"canvas_{plant}_swapped" # New unique key forces a clean component refresh
+    # This modern component simply displays the image and listens for a click
+    clicked_coords = streamlit_image_coordinates(
+        left_resized,
+        key=f"image_click_{plant}" # Unique key per plant
     )
 
 with col2:
     st.subheader("🦅 Corresponding Target View")
     
-    # Process clicks if user registers any coordinates
-    if canvas_result.image_data is not None and len(canvas_result.json_data["objects"]) > 0:
-        # Pull the absolute last click coordinates made by user
-        last_object = canvas_result.json_data["objects"][-1]
-        x_click = last_object["left"]
-        y_click = last_object["top"]
+    # If the user has clicked the image, 'clicked_coords' will contain the X and Y
+    if clicked_coords is not None:
+        x_click = clicked_coords['x']
+        y_click = clicked_coords['y']
         
-        # Draw a targeting reticle over the right image at identical relative space
+        # Create a copy of the right image to draw the target on
         right_output = right_resized.copy()
         draw = ImageDraw.Draw(right_output)
         
-        # Draw a crosshair/circle highlighting the matching leak spot
+        # Draw a bright cyan crosshair/circle highlighting the matching leak spot
         radius = 12
         draw.ellipse(
             (x_click - radius, y_click - radius, x_click + radius, y_click + radius), 
@@ -89,9 +77,10 @@ with col2:
             fill="red"
         )
         
-        st.image(right_output, use_container_width=True)
-        st.success(f"📍 Leak mapped coordinates relative to layout: X={int(x_click)}, Y={int(y_click)}")
+        # Display the result using standard Streamlit
+        st.image(right_output, use_container_width=False)
+        st.success(f"📍 Mapped Coordinates: X={int(x_click)}, Y={int(y_click)}")
     else:
-        # Base fallback view before any click triggers
-        st.image(right_resized, use_container_width=True)
-        st.info("💡 Click a leak location on the Left Image to view its mapped position on the Right.")
+        # What shows up before they click anything
+        st.image(right_resized, use_container_width=False)
+        st.info("💡 Click a location on the Left Image to map its position.")
