@@ -10,21 +10,21 @@ from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 # Set up page layout
 st.set_page_config(page_title="AGS Roof Leak Mapper", layout="wide")
 st.title("🏭 AGS Roof Leak Mapping Tool")
-st.write("Adjust the left image size independently to pinpoint precise locations. The right view will automatically project the coordinates onto a stable viewport.")
+st.write("Click on the left floor view to add a leak point. Adjust the scale slider below to zoom the left image for precise clicking.")
 
 # 1. Plant Selection
 plant = st.selectbox("Select Manufacturing Plant:", ["Plant 1", "Plant 2", "Plant 3"])
 
-# --- 🔍 LEFT IMAGE ONLY ZOOM CONTROL ---
+# --- 🔍 LEFT IMAGE ZOOM WORKSPACE ---
 st.write("---")
 col_zoom1, col_zoom2 = st.columns([2, 3])
 with col_zoom1:
     st.markdown("### 🔍 Precise Zoom Workspace Adjuster (Left Only)")
-    st.caption("Slide to expand the Left Floor Map up to 1400px wide for pixel-perfect accuracy.")
+    st.caption("Slide to expand the Left Floor Map image for pixel-perfect targeting.")
 with col_zoom2:
-    # This slider will dynamically control the left image size completely independently
-    LEFT_DISPLAY_WIDTH = st.slider(
-        "Floor Map Scale (Pixels Wide):", 
+    # This adjusts how large the component renders on screen without changing original coordinates
+    LEFT_ZOOM_WIDTH = st.slider(
+        "Floor Map Zoom Scale (Pixels Wide):", 
         min_value=400, 
         max_value=1400, 
         value=600, 
@@ -43,21 +43,21 @@ else:
     left_path = "data/Desk (under roof).jpg"
     right_path = "data/Office Ceiling (Roof).jpg"
 
-# 2. Safely Load and Resize Images
+# 2. Safely Load and Resize Images to a stable baseline size (e.g. 600px wide)
 try:
     left_img = Image.open(left_path).convert("RGB")
     right_img = Image.open(right_path).convert("RGB")
     
-    # 1. Calculate dynamic resizing for the LEFT image based on the ZOOM slider
-    ratio_left = LEFT_DISPLAY_WIDTH / left_img.width
-    height_left = int(left_img.height * ratio_left)
-    left_resized = left_img.resize((LEFT_DISPLAY_WIDTH, height_left))
+    # We use a solid baseline size for drawing logic so everything scales perfectly
+    BASELINE_WIDTH = 600
     
-    # 2. Keep the RIGHT target view locked at a comfortable static size (e.g., 600px)
-    RIGHT_STATIC_WIDTH = 600
-    ratio_right = RIGHT_STATIC_WIDTH / right_img.width
+    ratio_left = BASELINE_WIDTH / left_img.width
+    height_left = int(left_img.height * ratio_left)
+    left_resized = left_img.resize((BASELINE_WIDTH, height_left))
+    
+    ratio_right = BASELINE_WIDTH / right_img.width
     height_right = int(right_img.height * ratio_right)
-    right_resized = right_img.resize((RIGHT_STATIC_WIDTH, height_right))
+    right_resized = right_img.resize((BASELINE_WIDTH, height_right))
 
 except FileNotFoundError:
     st.error("⚠️ Could not find the image files. Please ensure 'Office Ceiling (Roof).jpg' and 'Desk (under roof).jpg' exist inside the 'data/' folder.")
@@ -82,8 +82,27 @@ right_display = right_resized.copy()
 draw_left = ImageDraw.Draw(left_display)
 draw_right = ImageDraw.Draw(right_display)
 
-# Draw all existing saved points onto both images using their custom text names
+# Draw all existing saved points onto both images
 for pt in st.session_state[f"leak_points_{plant}"]:
-    # Coordinates are stored relative to the zoom ratio used when they were clicked
-    # We must mathematically translate them to match the active, dynamic view configurations
-    click_ratio_left = pt
+    x, y = pt['x'], pt['y']
+    custom_name = pt['name']
+    
+    # Left View Indicators (Solid Red Dots mapped to custom text name)
+    draw_left.ellipse((x - 6, y - 6, x + 6, y + 6), fill="red")
+    draw_left.text((x + 8, y - 6), custom_name, fill="yellow")
+    
+    # Right View Indicators (Cyan Target Rings mapped to identical custom text name)
+    draw_right.ellipse((x - 12, y - 12, x + 12, y + 12), outline="cyan", width=3)
+    draw_right.ellipse((x - 3, y - 3, x + 3, y + 3), fill="red")
+    draw_right.text((x + 14, y - 12), custom_name, fill="cyan")
+
+# 4. Display Side-by-Side Views
+col1, col2 = st.columns(2)
+
+with col1:
+    st.subheader("🗺️ Floor Map View (Click Here)")
+    # Passing the width property here allows visual zooming while coordinates stay fixed to baseline dimensions
+    clicked_coords = streamlit_image_coordinates(
+        left_display,
+        width=LEFT_ZOOM_WIDTH,
+        key=f"image_click_{plant}"
