@@ -6,7 +6,7 @@ import time
 # Set up page layout
 st.set_page_config(page_title="AGS Roof Leak Mapper", layout="wide")
 st.title("🏭 AGS Roof Leak Mapping Tool")
-st.write("Click on the left floor view to add a leak point. Numbers and labels remain locked permanently to their points even when others are deleted.")
+st.write("Click on the left floor view to add a leak point. Labels remain synchronized across both images in real time.")
 
 # 1. Plant Selection
 plant = st.selectbox("Select Manufacturing Plant:", ["Plant 1", "Plant 2", "Plant 3"])
@@ -60,19 +60,19 @@ right_display = right_resized.copy()
 draw_left = ImageDraw.Draw(left_display)
 draw_right = ImageDraw.Draw(right_display)
 
-# Draw all existing saved points onto both images using their permanent serial number
+# Draw all existing saved points onto both images using their custom text names
 for pt in st.session_state[f"leak_points_{plant}"]:
     x, y = pt['x'], pt['y']
-    serial_num = pt['serial']
+    custom_name = pt['name']
     
-    # Left View Indicators (Solid Red Dots mapped to permanent serial ID)
+    # Left View Indicators (Solid Red Dots mapped to custom text name)
     draw_left.ellipse((x - 6, y - 6, x + 6, y + 6), fill="red")
-    draw_left.text((x + 8, y - 6), f"#{serial_num}", fill="yellow")
+    draw_left.text((x + 8, y - 6), custom_name, fill="yellow")
     
-    # Right View Indicators (Cyan Target Rings mapped to custom text name)
+    # Right View Indicators (Cyan Target Rings mapped to identical custom text name)
     draw_right.ellipse((x - 12, y - 12, x + 12, y + 12), outline="cyan", width=3)
     draw_right.ellipse((x - 3, y - 3, x + 3, y + 3), fill="red")
-    draw_right.text((x + 14, y - 12), pt['name'], fill="cyan")
+    draw_right.text((x + 14, y - 12), custom_name, fill="cyan")
 
 # 4. Display Side-by-Side Views
 col1, col2 = st.columns(2)
@@ -99,7 +99,6 @@ with col1:
             'name': f"Leak Point {current_serial}"
         })
         
-        # Increment the counter so the next point gets a brand new number completely independent of array size
         st.session_state[f"point_counter_{plant}"] += 1
         st.rerun()
 
