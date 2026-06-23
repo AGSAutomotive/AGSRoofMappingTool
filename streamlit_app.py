@@ -1,6 +1,6 @@
 import streamlit as st
 from PIL import Image, ImageDraw
-from streamlit-drawable-canvas import st_canvas
+from streamlit_drawable_canvas import st_canvas
 
 st.set_page_config(layout="wide")
 st.title("Roof Leak Mapping System")
