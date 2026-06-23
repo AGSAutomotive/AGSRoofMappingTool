@@ -1,6 +1,7 @@
 import streamlit as st
 from streamlit_image_coordinates import streamlit_image_coordinates
 from PIL import Image, ImageDraw
+import time
 
 # Set up page layout
 st.set_page_config(page_title="AGS Roof Leak Mapper", layout="wide")
@@ -72,7 +73,7 @@ for idx, pt in enumerate(st.session_state[f"leak_points_{plant}"]):
 col1, col2 = st.columns(2)
 
 with col1:
-    st.subheader("🪵 Floor Map View (Click Here)")
+    st.subheader("🗺️ Floor Map View (Click Here)")
     clicked_coords = streamlit_image_coordinates(
         left_display,
         key=f"image_click_{plant}" 
@@ -82,9 +83,12 @@ with col1:
     if clicked_coords is not None and clicked_coords != st.session_state[f"last_click_{plant}"]:
         st.session_state[f"last_click_{plant}"] = clicked_coords
         
-        # Add the new coordinates to our tracking list
+        # Add the new coordinates to our tracking list with a permanent unique ID
         new_id = len(st.session_state[f"leak_points_{plant}"]) + 1
+        unique_timestamp_id = str(time.time()).replace(".", "") # Generates a unique string
+        
         st.session_state[f"leak_points_{plant}"].append({
+            'id': unique_timestamp_id,
             'x': clicked_coords['x'],
             'y': clicked_coords['y'],
             'name': f"Leak Point {new_id}"
@@ -106,18 +110,17 @@ if not points_list:
 else:
     # Build control rows for editing items individually
     for index, point in enumerate(points_list):
-        # Create a tidy row layout layout for listing properties
         edit_col1, edit_col2, edit_col3 = st.columns([1, 3, 2])
         
         with edit_col1:
             st.write(f"**#{index + 1}** (X: {int(point['x'])}, Y: {int(point['y'])})")
             
         with edit_col2:
-            # Inline text input allows real-time renaming updates
+            # Using point['id'] as the key fixes the data shifting bug permanently
             new_name = st.text_input(
                 "Rename label:", 
                 value=point['name'], 
-                key=f"rename_{plant}_{index}",
+                key=f"rename_{plant}_{point['id']}",
                 label_visibility="collapsed"
             )
             if new_name != point['name']:
@@ -125,7 +128,7 @@ else:
                 st.rerun()
                 
         with edit_col3:
-            # Delete handler removes the item from index list
-            if st.button("🗑️ Delete Record", key=f"del_{plant}_{index}"):
+            # Delete handler removes the item safely from index list
+            if st.button("🗑️ Delete Record", key=f"del_{plant}_{point['id']}"):
                 st.session_state[f"leak_points_{plant}"].pop(index)
                 st.rerun()
