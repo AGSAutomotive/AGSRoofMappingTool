@@ -1,16 +1,13 @@
 import streamlit as st
 from PIL import Image, ImageDraw
-import base64
-import io
-
-# If canvas is installed correctly
+import numpy as np
 from streamlit_drawable_canvas import st_canvas
 
 st.set_page_config(layout="wide")
 st.title("Roof Leak Mapping System")
 
 # -----------------------------
-# PLANT SELECTION
+# PLANT SELECTOR
 # -----------------------------
 plant = st.selectbox("Select Manufacturing Plant", ["Plant A", "Plant B", "Plant C"])
 
@@ -35,16 +32,8 @@ plant_data = {
 ceiling_img = Image.open(plant_data[plant]["ceiling"]).convert("RGB")
 roof_img = Image.open(plant_data[plant]["roof"]).convert("RGB")
 
-# -----------------------------
-# CONVERT IMAGE → BASE64 (FIX FOR CANVAS)
-# -----------------------------
-def pil_to_base64(img):
-    buffer = io.BytesIO()
-    img.save(buffer, format="PNG")
-    encoded = base64.b64encode(buffer.getvalue()).decode()
-    return "data:image/png;base64," + encoded
-
-ceiling_base64 = pil_to_base64(ceiling_img)
+# CONVERT TO NUMPY (IMPORTANT FIX)
+ceiling_array = np.array(ceiling_img)
 
 # -----------------------------
 # SESSION STATE
@@ -62,20 +51,19 @@ if "leaks" not in st.session_state:
 col1, col2 = st.columns(2)
 
 # -----------------------------
-# CEILING (CLICKABLE CANVAS)
+# CEILING CLICK AREA
 # -----------------------------
 with col1:
     st.subheader("Click Ceiling to Mark Leak")
 
     canvas_result = st_canvas(
-        background_image=ceiling_base64,
+        background_image=ceiling_array,
         drawing_mode="point",
         height=500,
         width=500,
         key=plant
     )
 
-    # Capture clicks
     if canvas_result.json_data:
         objects = canvas_result.json_data["objects"]
 
@@ -84,12 +72,11 @@ with col1:
             x = last["left"]
             y = last["top"]
 
-            # prevent duplicates
             if len(st.session_state.leaks[plant]) == 0 or st.session_state.leaks[plant][-1] != (x, y):
                 st.session_state.leaks[plant].append((x, y))
 
 # -----------------------------
-# ROOF (MAPPED OUTPUT)
+# ROOF DISPLAY
 # -----------------------------
 with col2:
     st.subheader("Roof Plan (Mapped Leaks)")
