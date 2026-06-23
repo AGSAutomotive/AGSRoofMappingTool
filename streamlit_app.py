@@ -1,48 +1,52 @@
 import sys
 import types
 import streamlit as st
-
-# =========================================================================
-# 1. FIXED IMAGE CONVERSION PATCH FOR MODERN STREAMLIT
-# =========================================================================
 import io
-from streamlit.runtime import get_instance
+import base64
+import inspect
 
-def canvas_compatible_image_to_url(data, width=None, clamp=False, channels="RGB", output_format="JPEG", image_id="canvas_img"):
-    """
-    Safely converts PIL images directly to an in-memory web URL, 
-    bypassing Streamlit's layout configuration checks.
-    """
-    # If it's a PIL image, drop its format down to bytes
-    if hasattr(data, "save"):
-        buffered = io.BytesIO()
-        data.save(buffered, format="JPEG")
-        img_bytes = buffered.getvalue()
-    elif isinstance(data, bytes):
-        img_bytes = data
-    else:
-        img_bytes = bytes(data)
-
-    runtime_instance = get_instance()
-    if runtime_instance is not None:
-        file_mgr = runtime_instance.media_file_mgr
-        # Add straight to the active media file manager session
-        media_file = file_mgr.add(img_bytes, "image/jpeg", image_id)
-        return media_file.url
-    return ""
-
-# Inject our helper safely into the Streamlit image utility layers
+# =========================================================================
+# HYBRID PATCH: Fixes blank canvas while protecting standard st.image()
+# =========================================================================
+# Keep a reference to the real original function
 try:
     import streamlit.elements.lib.image_utils as image_utils
-    image_utils.image_to_url = canvas_compatible_image_to_url
+    ORIG_IMAGE_TO_URL = image_utils.image_to_url
+except Exception:
+    ORIG_IMAGE_TO_URL = None
+
+def hybrid_image_to_url(data, width=None, clamp=False, channels="RGB", output_format="JPEG", image_id="canvas_img"):
+    # Look at the execution stack to see if the canvas component triggered this
+    is_canvas = any("streamlit_drawable_canvas" in frame.filename for frame in inspect.stack() if frame.filename)
+
+    if is_canvas:
+        # Force Base64 string so Streamlit Cloud iframe cannot block the image
+        if hasattr(data, "save"):
+            buffered = io.BytesIO()
+            data.save(buffered, format="JPEG")
+            img_bytes = buffered.getvalue()
+        elif isinstance(data, bytes):
+            img_bytes = data
+        else:
+            img_bytes = bytes(data)
+            
+        b64_str = base64.b64encode(img_bytes).decode()
+        return f"data:image/jpeg;base64,{b64_str}"
+    
+    # If standard st.image() triggered this, fall back to native streamlit behavior safely
+    if ORIG_IMAGE_TO_URL is not None:
+        return ORIG_IMAGE_TO_URL(data, width, clamp, channels, output_format, image_id)
+    return ""
+
+# Apply the patch
+try:
+    import streamlit.elements.image as st_image
+    st_image.image_to_url = hybrid_image_to_url
 except Exception:
     pass
 
-try:
-    import streamlit.elements.image as st_image
-    st_image.image_to_url = canvas_compatible_image_to_url
-except Exception:
-    pass
+if ORIG_IMAGE_TO_URL is not None:
+    image_utils.image_to_url = hybrid_image_to_url
 # =========================================================================
 
 from streamlit_drawable_canvas import st_canvas
@@ -53,7 +57,7 @@ st.set_page_config(page_title="AGS Roof Leak Mapper", layout="wide")
 st.title("🏭 AGS Roof Leak Mapping Tool")
 st.write("Click anywhere on the map on the left to mark a leak. The corresponding location will automatically calculate and display on the right view.")
 
-# 2. Plant Selection Configuration
+# Plant Selection Configuration
 plant = st.selectbox("Select Manufacturing Plant:", ["Plant 1", "Plant 2", "Plant 3"])
 
 # Swapped paths: Desk is on the left, Ceiling is on the right
@@ -67,7 +71,7 @@ else:
     left_path = "data/Desk (under roof).jpg"
     right_path = "data/Office Ceiling (Roof).jpg"
 
-# 3. Safely Load and Resize Images
+# Safely Load and Resize Images
 try:
     left_img = Image.open(left_path).convert("RGB")
     right_img = Image.open(right_path).convert("RGB")
@@ -88,7 +92,7 @@ except FileNotFoundError:
     st.error("⚠️ Could not find the image files in the 'data/' folder. Please ensure 'Office Ceiling (Roof).jpg' and 'Desk (under roof).jpg' exist inside your repository.")
     st.stop()
 
-# 4. Create Side-by-Side App Interface
+# Create Side-by-Side App Interface
 col1, col2 = st.columns(2)
 
 with col1:
@@ -105,7 +109,7 @@ with col1:
         width=DISPLAY_WIDTH,
         drawing_mode="point", # simple dot click mapping
         point_display_radius=6,
-        key=f"canvas_fixed_{plant}" # Forces a clean component refresh per plant selection
+        key=f"canvas_fixed_{plant}" 
     )
 
 with col2:
@@ -134,7 +138,7 @@ with col2:
             fill="red"
         )
         
-        # Display using Streamlit's native mechanism
+        # Display natively without crashing
         st.image(right_output, use_container_width=True)
         st.success(f"📍 Leak mapped coordinates relative to layout: X={int(x_click)}, Y={int(y_click)}")
     else:
