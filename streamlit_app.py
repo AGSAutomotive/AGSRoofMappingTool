@@ -45,7 +45,7 @@ except FileNotFoundError:
 col1, col2 = st.columns(2)
 
 with col1:
-    st.subheader("📸 Primary Map (Click Here)")
+    st.subheader("Floor Map (Click Here)")
     
     # This modern component simply displays the image and listens for a click
     clicked_coords = streamlit_image_coordinates(
@@ -54,7 +54,7 @@ with col1:
     )
 
 with col2:
-    st.subheader("🦅 Corresponding Target View")
+    st.subheader("🦅 Corresponding Roof View")
     
     # If the user has clicked the image, 'clicked_coords' will contain the X and Y
     if clicked_coords is not None:
