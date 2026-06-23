@@ -5,7 +5,7 @@ from PIL import Image, ImageDraw
 # Set up page layout
 st.set_page_config(page_title="AGS Roof Leak Mapper", layout="wide")
 st.title("🏭 AGS Roof Leak Mapping Tool")
-st.write("Click anywhere on the map on the left. The corresponding location will automatically calculate and display on the right.")
+st.write("Click on the left floor view to add a leak point. Manage, rename, or delete your saved points in the dashboard below.")
 
 # 1. Plant Selection
 plant = st.selectbox("Select Manufacturing Plant:", ["Plant 1", "Plant 2", "Plant 3"])
@@ -26,7 +26,6 @@ try:
     left_img = Image.open(left_path).convert("RGB")
     right_img = Image.open(right_path).convert("RGB")
     
-    # Standardize widths so the coordinates translate perfectly 1:1
     DISPLAY_WIDTH = 600
     
     ratio_left = DISPLAY_WIDTH / left_img.width
@@ -41,46 +40,92 @@ except FileNotFoundError:
     st.error("⚠️ Could not find the image files. Please ensure 'Office Ceiling (Roof).jpg' and 'Desk (under roof).jpg' exist inside the 'data/' folder.")
     st.stop()
 
-# 3. Create Side-by-Side UI
+# Initialize session state tracking list for the active plant
+if f"leak_points_{plant}" not in st.session_state:
+    st.session_state[f"leak_points_{plant}"] = []
+
+# Keep track of the temporary last click to catch new interactions
+if f"last_click_{plant}" not in st.session_state:
+    st.session_state[f"last_click_{plant}"] = None
+
+# 3. Prepare Image Overlays (Draw all currently active points)
+left_display = left_resized.copy()
+right_display = right_resized.copy()
+
+draw_left = ImageDraw.Draw(left_display)
+draw_right = ImageDraw.Draw(right_display)
+
+# Draw all existing saved points onto both images
+for idx, pt in enumerate(st.session_state[f"leak_points_{plant}"]):
+    x, y = pt['x'], pt['y']
+    
+    # Left View Indicators (Solid Red Dots)
+    draw_left.ellipse((x - 6, y - 6, x + 6, y + 6), fill="red")
+    draw_left.text((x + 8, y - 6), str(idx + 1), fill="yellow")
+    
+    # Right View Indicators (Cyan Target Rings)
+    draw_right.ellipse((x - 12, y - 12, x + 12, y + 12), outline="cyan", width=3)
+    draw_right.ellipse((x - 3, y - 3, x + 3, y + 3), fill="red")
+    draw_right.text((x + 14, y - 12), pt['name'], fill="cyan")
+
+# 4. Display Side-by-Side Views
 col1, col2 = st.columns(2)
 
 with col1:
-    st.subheader("🗺️Floor Map (Click Here)")
-    
-    # This modern component simply displays the image and listens for a click
+    st.subheader("🪵 Floor Map View (Click Here)")
     clicked_coords = streamlit_image_coordinates(
-        left_resized,
-        key=f"image_click_{plant}" # Unique key per plant
+        left_display,
+        key=f"image_click_{plant}" 
     )
+    
+    # Process if a brand new click location is registered
+    if clicked_coords is not None and clicked_coords != st.session_state[f"last_click_{plant}"]:
+        st.session_state[f"last_click_{plant}"] = clicked_coords
+        
+        # Add the new coordinates to our tracking list
+        new_id = len(st.session_state[f"leak_points_{plant}"]) + 1
+        st.session_state[f"leak_points_{plant}"].append({
+            'x': clicked_coords['x'],
+            'y': clicked_coords['y'],
+            'name': f"Leak Point {new_id}"
+        })
+        st.rerun()
 
 with col2:
-    st.subheader("🦅Corresponding Roof View")
-    
-    # If the user has clicked the image, 'clicked_coords' will contain the X and Y
-    if clicked_coords is not None:
-        x_click = clicked_coords['x']
-        y_click = clicked_coords['y']
+    st.subheader("🦅 Corresponding Roof View")
+    st.image(right_display, use_container_width=False)
+
+# --- 📋 TRACKING LIST & MANAGEMENT DASHBOARD ---
+st.write("---")
+st.subheader("📋 Saved Leak Records Dashboard")
+
+points_list = st.session_state[f"leak_points_{plant}"]
+
+if not points_list:
+    st.info("💡 No leaks mapped yet. Click on the left Floor Map image to begin pinning locations.")
+else:
+    # Build control rows for editing items individually
+    for index, point in enumerate(points_list):
+        # Create a tidy row layout layout for listing properties
+        edit_col1, edit_col2, edit_col3 = st.columns([1, 3, 2])
         
-        # Create a copy of the right image to draw the target on
-        right_output = right_resized.copy()
-        draw = ImageDraw.Draw(right_output)
-        
-        # Draw a bright cyan crosshair/circle highlighting the matching leak spot
-        radius = 12
-        draw.ellipse(
-            (x_click - radius, y_click - radius, x_click + radius, y_click + radius), 
-            outline="cyan", 
-            width=4
-        )
-        draw.ellipse(
-            (x_click - 3, y_click - 3, x_click + 3, y_click + 3), 
-            fill="red"
-        )
-        
-        # Display the result using standard Streamlit
-        st.image(right_output, use_container_width=False)
-        st.success(f"📍 Mapped Coordinates: X={int(x_click)}, Y={int(y_click)}")
-    else:
-        # What shows up before they click anything
-        st.image(right_resized, use_container_width=False)
-        st.info("💡 Click a location on the Left Image to map its position.")
+        with edit_col1:
+            st.write(f"**#{index + 1}** (X: {int(point['x'])}, Y: {int(point['y'])})")
+            
+        with edit_col2:
+            # Inline text input allows real-time renaming updates
+            new_name = st.text_input(
+                "Rename label:", 
+                value=point['name'], 
+                key=f"rename_{plant}_{index}",
+                label_visibility="collapsed"
+            )
+            if new_name != point['name']:
+                st.session_state[f"leak_points_{plant}"][index]['name'] = new_name
+                st.rerun()
+                
+        with edit_col3:
+            # Delete handler removes the item from index list
+            if st.button("🗑️ Delete Record", key=f"del_{plant}_{index}"):
+                st.session_state[f"leak_points_{plant}"].pop(index)
+                st.rerun()
