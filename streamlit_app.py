@@ -3,59 +3,46 @@ import types
 import streamlit as st
 
 # =========================================================================
-# 1. THE REFINED MODERN STREAMLIT COMPATIBILITY PATCH
+# 1. FIXED IMAGE CONVERSION PATCH FOR MODERN STREAMLIT
 # =========================================================================
 import io
-import inspect
 from streamlit.runtime import get_instance
 
-# Keep a reference to the real original function before we touch it
-try:
-    import streamlit.elements.lib.image_utils as image_utils
-    ORIG_IMAGE_TO_URL = image_utils.image_to_url
-except Exception:
-    ORIG_IMAGE_TO_URL = None
-
-def ultimate_image_to_url(data, width=None, clamp=False, channels="RGB", output_format="JPEG", image_id="canvas_img"):
+def canvas_compatible_image_to_url(data, width=None, clamp=False, channels="RGB", output_format="JPEG", image_id="canvas_img"):
     """
-    Directly bypasses Streamlit's internal layout checking engine for the canvas,
-    while safely falling back to standard behavior for regular st.image calls.
+    Safely converts PIL images directly to an in-memory web URL, 
+    bypassing Streamlit's layout configuration checks.
     """
-    # Look at the execution stack to see if this call came from streamlit_drawable_canvas
-    stack = inspect.stack()
-    is_canvas_call = any("streamlit_drawable_canvas" in frame.filename for frame in stack if frame.filename)
+    # If it's a PIL image, drop its format down to bytes
+    if hasattr(data, "save"):
+        buffered = io.BytesIO()
+        data.save(buffered, format="JPEG")
+        img_bytes = buffered.getvalue()
+    elif isinstance(data, bytes):
+        img_bytes = data
+    else:
+        img_bytes = bytes(data)
 
-    if is_canvas_call:
-        if hasattr(data, "save"):
-            buffered = io.BytesIO()
-            data.save(buffered, format="JPEG")
-            img_bytes = buffered.getvalue()
-        elif isinstance(data, bytes):
-            img_bytes = data
-        else:
-            img_bytes = bytes(data)
-
-        runtime_instance = get_instance()
-        if runtime_instance is not None:
-            file_mgr = runtime_instance.media_file_mgr
-            media_file = file_mgr.add(img_bytes, "image/jpeg", image_id)
-            return media_file.url
-        return ""
-    
-    # If it's a regular st.image call, hand it back to Streamlit's original logic
-    if ORIG_IMAGE_TO_URL is not None:
-        return ORIG_IMAGE_TO_URL(data, width, clamp, channels, output_format, image_id)
+    runtime_instance = get_instance()
+    if runtime_instance is not None:
+        file_mgr = runtime_instance.media_file_mgr
+        # Add straight to the active media file manager session
+        media_file = file_mgr.add(img_bytes, "image/jpeg", image_id)
+        return media_file.url
     return ""
 
-# Overwrite globally across all namespaces
+# Inject our helper safely into the Streamlit image utility layers
 try:
-    import streamlit.elements.image as st_image
-    st_image.image_to_url = ultimate_image_to_url
+    import streamlit.elements.lib.image_utils as image_utils
+    image_utils.image_to_url = canvas_compatible_image_to_url
 except Exception:
     pass
 
-if ORIG_IMAGE_TO_URL is not None:
-    image_utils.image_to_url = ultimate_image_to_url
+try:
+    import streamlit.elements.image as st_image
+    st_image.image_to_url = canvas_compatible_image_to_url
+except Exception:
+    pass
 # =========================================================================
 
 from streamlit_drawable_canvas import st_canvas
@@ -69,7 +56,7 @@ st.write("Click anywhere on the map on the left to mark a leak. The correspondin
 # 2. Plant Selection Configuration
 plant = st.selectbox("Select Manufacturing Plant:", ["Plant 1", "Plant 2", "Plant 3"])
 
-# Image pathways
+# Swapped paths: Desk is on the left, Ceiling is on the right
 if plant == "Plant 1":
     left_path = "data/Desk (under roof).jpg"
     right_path = "data/Office Ceiling (Roof).jpg"
@@ -85,13 +72,15 @@ try:
     left_img = Image.open(left_path).convert("RGB")
     right_img = Image.open(right_path).convert("RGB")
     
+    # Fix a display width to prevent any image cutting off or misalignment
     DISPLAY_WIDTH = 600
     
-    # Calculate uniform dimensions
+    # Calculate aspect ratio based scaling
     l_width, l_height = left_img.size
     scale_ratio = DISPLAY_WIDTH / float(l_width)
     display_height = int(float(l_height) * float(scale_ratio))
     
+    # Resize both for clean parallel canvas layout
     left_resized = left_img.resize((DISPLAY_WIDTH, display_height))
     right_resized = right_img.resize((DISPLAY_WIDTH, display_height))
 
@@ -107,16 +96,16 @@ with col1:
     
     # Interactive clickable canvas layer
     canvas_result = st_canvas(
-        fill_color="rgba(255, 0, 0, 0.3)",  
+        fill_color="rgba(255, 0, 0, 0.3)",  # semi-transparent red
         stroke_width=3,
         stroke_color="#FF0000",
-        background_image=left_resized, 
+        background_image=left_resized,
         update_streamlit=True,
         height=display_height,
         width=DISPLAY_WIDTH,
-        drawing_mode="point", 
+        drawing_mode="point", # simple dot click mapping
         point_display_radius=6,
-        key=f"canvas_final_v2_{plant}" 
+        key=f"canvas_fixed_{plant}" # Forces a clean component refresh per plant selection
     )
 
 with col2:
@@ -124,14 +113,16 @@ with col2:
     
     # Process clicks if user registers any coordinates
     if canvas_result.image_data is not None and len(canvas_result.json_data["objects"]) > 0:
+        # Pull the absolute last click coordinates made by user
         last_object = canvas_result.json_data["objects"][-1]
         x_click = last_object["left"]
         y_click = last_object["top"]
         
+        # Draw a targeting reticle over the right image at identical relative space
         right_output = right_resized.copy()
         draw = ImageDraw.Draw(right_output)
         
-        # Target ring
+        # Draw a crosshair/circle highlighting the matching leak spot
         radius = 12
         draw.ellipse(
             (x_click - radius, y_click - radius, x_click + radius, y_click + radius), 
@@ -143,8 +134,10 @@ with col2:
             fill="red"
         )
         
+        # Display using Streamlit's native mechanism
         st.image(right_output, use_container_width=True)
         st.success(f"📍 Leak mapped coordinates relative to layout: X={int(x_click)}, Y={int(y_click)}")
     else:
+        # Base fallback view before any click triggers
         st.image(right_resized, use_container_width=True)
         st.info("💡 Click a leak location on the Left Image to view its mapped position on the Right.")
