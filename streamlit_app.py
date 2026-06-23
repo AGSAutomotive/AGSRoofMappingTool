@@ -3,48 +3,59 @@ import types
 import streamlit as st
 
 # =========================================================================
-# 1. THE ULTIMATE MODERN STREAMLIT COMPATIBILITY PATCH
+# 1. THE REFINED MODERN STREAMLIT COMPATIBILITY PATCH
 # =========================================================================
 import io
+import inspect
 from streamlit.runtime import get_instance
-from streamlit.runtime.media_file_manager import MediaFileManager
+
+# Keep a reference to the real original function before we touch it
+try:
+    import streamlit.elements.lib.image_utils as image_utils
+    ORIG_IMAGE_TO_URL = image_utils.image_to_url
+except Exception:
+    ORIG_IMAGE_TO_URL = None
 
 def ultimate_image_to_url(data, width=None, clamp=False, channels="RGB", output_format="JPEG", image_id="canvas_img"):
     """
-    Directly bypasses Streamlit's internal layout checking engine by safely 
-    registering the image bytes straight into the modern Streamlit Media Manager.
+    Directly bypasses Streamlit's internal layout checking engine for the canvas,
+    while safely falling back to standard behavior for regular st.image calls.
     """
-    # If it's already a PIL image, drop its format down to bytes
-    if hasattr(data, "save"):
-        buffered = io.BytesIO()
-        data.save(buffered, format="JPEG")
-        img_bytes = buffered.getvalue()
-    elif isinstance(data, bytes):
-        img_bytes = data
-    else:
-        img_bytes = bytes(data)
+    # Look at the execution stack to see if this call came from streamlit_drawable_canvas
+    stack = inspect.stack()
+    is_canvas_call = any("streamlit_drawable_canvas" in frame.filename for frame in stack if frame.filename)
 
-    # Secure an active instance of the file manager engine
-    runtime_instance = get_instance()
-    if runtime_instance is not None:
-        file_mgr = runtime_instance.media_file_mgr
-        # Directly register raw bytes and return the served web URL route string
-        media_file = file_mgr.add(img_bytes, "image/jpeg", image_id)
-        return media_file.url
+    if is_canvas_call:
+        if hasattr(data, "save"):
+            buffered = io.BytesIO()
+            data.save(buffered, format="JPEG")
+            img_bytes = buffered.getvalue()
+        elif isinstance(data, bytes):
+            img_bytes = data
+        else:
+            img_bytes = bytes(data)
+
+        runtime_instance = get_instance()
+        if runtime_instance is not None:
+            file_mgr = runtime_instance.media_file_mgr
+            media_file = file_mgr.add(img_bytes, "image/jpeg", image_id)
+            return media_file.url
+        return ""
+    
+    # If it's a regular st.image call, hand it back to Streamlit's original logic
+    if ORIG_IMAGE_TO_URL is not None:
+        return ORIG_IMAGE_TO_URL(data, width, clamp, channels, output_format, image_id)
     return ""
 
-# Overwrite the function everywhere Streamlit or Canvas might call it
+# Overwrite globally across all namespaces
 try:
     import streamlit.elements.image as st_image
     st_image.image_to_url = ultimate_image_to_url
 except Exception:
     pass
 
-try:
-    import streamlit.elements.lib.image_utils as image_utils
+if ORIG_IMAGE_TO_URL is not None:
     image_utils.image_to_url = ultimate_image_to_url
-except Exception:
-    pass
 # =========================================================================
 
 from streamlit_drawable_canvas import st_canvas
@@ -94,7 +105,7 @@ col1, col2 = st.columns(2)
 with col1:
     st.subheader("📸 Primary Map View (Click Here)")
     
-    # Interactive clickable canvas layer using the safely processed PIL Image
+    # Interactive clickable canvas layer
     canvas_result = st_canvas(
         fill_color="rgba(255, 0, 0, 0.3)",  
         stroke_width=3,
@@ -105,7 +116,7 @@ with col1:
         width=DISPLAY_WIDTH,
         drawing_mode="point", 
         point_display_radius=6,
-        key=f"canvas_final_{plant}" 
+        key=f"canvas_final_v2_{plant}" 
     )
 
 with col2:
