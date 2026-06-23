@@ -1,54 +1,4 @@
-import sys
-import types
 import streamlit as st
-import io
-import base64
-import inspect
-
-# =========================================================================
-# HYBRID PATCH: Fixes blank canvas while protecting standard st.image()
-# =========================================================================
-# Keep a reference to the real original function
-try:
-    import streamlit.elements.lib.image_utils as image_utils
-    ORIG_IMAGE_TO_URL = image_utils.image_to_url
-except Exception:
-    ORIG_IMAGE_TO_URL = None
-
-def hybrid_image_to_url(data, width=None, clamp=False, channels="RGB", output_format="JPEG", image_id="canvas_img"):
-    # Look at the execution stack to see if the canvas component triggered this
-    is_canvas = any("streamlit_drawable_canvas" in frame.filename for frame in inspect.stack() if frame.filename)
-
-    if is_canvas:
-        # Force Base64 string so Streamlit Cloud iframe cannot block the image
-        if hasattr(data, "save"):
-            buffered = io.BytesIO()
-            data.save(buffered, format="JPEG")
-            img_bytes = buffered.getvalue()
-        elif isinstance(data, bytes):
-            img_bytes = data
-        else:
-            img_bytes = bytes(data)
-            
-        b64_str = base64.b64encode(img_bytes).decode()
-        return f"data:image/jpeg;base64,{b64_str}"
-    
-    # If standard st.image() triggered this, fall back to native streamlit behavior safely
-    if ORIG_IMAGE_TO_URL is not None:
-        return ORIG_IMAGE_TO_URL(data, width, clamp, channels, output_format, image_id)
-    return ""
-
-# Apply the patch
-try:
-    import streamlit.elements.image as st_image
-    st_image.image_to_url = hybrid_image_to_url
-except Exception:
-    pass
-
-if ORIG_IMAGE_TO_URL is not None:
-    image_utils.image_to_url = hybrid_image_to_url
-# =========================================================================
-
 from streamlit_drawable_canvas import st_canvas
 from PIL import Image, ImageDraw
 
@@ -57,10 +7,10 @@ st.set_page_config(page_title="AGS Roof Leak Mapper", layout="wide")
 st.title("🏭 AGS Roof Leak Mapping Tool")
 st.write("Click anywhere on the map on the left to mark a leak. The corresponding location will automatically calculate and display on the right view.")
 
-# Plant Selection Configuration
+# 1. Plant Selection Configuration
 plant = st.selectbox("Select Manufacturing Plant:", ["Plant 1", "Plant 2", "Plant 3"])
 
-# Swapped paths: Desk is on the left, Ceiling is on the right
+# Swapped paths so the Desk is now the interactive image on the left
 if plant == "Plant 1":
     left_path = "data/Desk (under roof).jpg"
     right_path = "data/Office Ceiling (Roof).jpg"
@@ -71,8 +21,9 @@ else:
     left_path = "data/Desk (under roof).jpg"
     right_path = "data/Office Ceiling (Roof).jpg"
 
-# Safely Load and Resize Images
+# 2. Safely Load, Convert, and Resize Images
 try:
+    # .convert("RGB") ensures the canvas can read the pixel data flawlessly
     left_img = Image.open(left_path).convert("RGB")
     right_img = Image.open(right_path).convert("RGB")
     
@@ -92,7 +43,7 @@ except FileNotFoundError:
     st.error("⚠️ Could not find the image files in the 'data/' folder. Please ensure 'Office Ceiling (Roof).jpg' and 'Desk (under roof).jpg' exist inside your repository.")
     st.stop()
 
-# Create Side-by-Side App Interface
+# 3. Create Side-by-Side App Interface
 col1, col2 = st.columns(2)
 
 with col1:
@@ -109,7 +60,7 @@ with col1:
         width=DISPLAY_WIDTH,
         drawing_mode="point", # simple dot click mapping
         point_display_radius=6,
-        key=f"canvas_fixed_{plant}" 
+        key=f"canvas_{plant}_swapped" # New unique key forces a clean component refresh
     )
 
 with col2:
@@ -138,7 +89,6 @@ with col2:
             fill="red"
         )
         
-        # Display natively without crashing
         st.image(right_output, use_container_width=True)
         st.success(f"📍 Leak mapped coordinates relative to layout: X={int(x_click)}, Y={int(y_click)}")
     else:
