@@ -21,18 +21,14 @@ st.set_page_config(page_title="AGS Roof Leak Mapper", layout="wide")
 st.title("🏭 AGS Roof Leak Mapping Tool")
 st.write("Click anywhere on the inner ceiling map to mark a leak. The corresponding location will automatically calculate and display on the roof view.")
 
----
-
 # 2. Plant Selection Configuration
 plant = st.selectbox("Select Manufacturing Plant:", ["Plant 1", "Plant 2", "Plant 3"])
 
 # Define paths based on your uploaded files
-# (Using your actual file names from your data folder)
 if plant == "Plant 1":
     ceiling_path = "data/Office Ceiling (Roof).jpg"
     roof_path = "data/Desk (under roof).jpg"
 elif plant == "Plant 2":
-    # Fallback to the same files for demonstration until you upload unique plant images
     ceiling_path = "data/Office Ceiling (Roof).jpg"
     roof_path = "data/Desk (under roof).jpg"
 else:
@@ -57,10 +53,8 @@ try:
     roof_resized = roof_img.resize((DISPLAY_WIDTH, display_height))
 
 except FileNotFoundError:
-    st.error(f"⚠️ Could not find the image files in the 'data/' folder. Please ensure 'Office Ceiling (Roof).jpg' and 'Desk (under roof).jpg' exist inside your repository.")
+    st.error("⚠️ Could not find the image files in the 'data/' folder. Please ensure 'Office Ceiling (Roof).jpg' and 'Desk (under roof).jpg' exist inside your repository.")
     st.stop()
-
----
 
 # 4. Create Side-by-Side App Interface
 col1, col2 = st.columns(2)
