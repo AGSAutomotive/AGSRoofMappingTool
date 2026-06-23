@@ -1,35 +1,4 @@
-import sys
-import types
 import streamlit as st
-
-# =========================================================================
-# 1. ROBUST MONKEY-PATCH FOR MODERN STREAMLIT COMPATIBILITY
-# =========================================================================
-import streamlit.elements.lib.image_utils as image_utils
-
-# Create a modern mock class that mimics Streamlit's internal layout expectations
-class MockLayoutConfig:
-    def __init__(self, width=None):
-        self.width = width
-
-def patched_image_to_url(data, width, clamp, channels, output_format, image_id):
-    # Bypass the broken internal _ensure_image_size_and_format check by passing our mock layout object
-    mock_layout = MockLayoutConfig(width=width)
-    return image_utils._image_to_url(data, mock_layout, output_format, image_id)
-
-# Force the canvas package to see our fixed version instead
-try:
-    import streamlit.elements.image as st_image
-    st_image.image_to_url = patched_image_to_url
-except (ImportError, AttributeError):
-    mod = types.ModuleType("streamlit.elements.image")
-    mod.image_to_url = patched_image_to_url
-    sys.modules["streamlit.elements.image"] = mod
-
-# Force override it globally in image_utils as well just in case
-image_utils.image_to_url = patched_image_to_url
-# =========================================================================
-
 from streamlit_drawable_canvas import st_canvas
 from PIL import Image, ImageDraw
 
@@ -38,7 +7,7 @@ st.set_page_config(page_title="AGS Roof Leak Mapper", layout="wide")
 st.title("🏭 AGS Roof Leak Mapping Tool")
 st.write("Click anywhere on the inner ceiling map to mark a leak. The corresponding location will automatically calculate and display on the roof view.")
 
-# 2. Plant Selection Configuration
+# 1. Plant Selection Configuration
 plant = st.selectbox("Select Manufacturing Plant:", ["Plant 1", "Plant 2", "Plant 3"])
 
 # Define paths based on your uploaded files
@@ -52,12 +21,12 @@ else:
     ceiling_path = "data/Office Ceiling (Roof).jpg"
     roof_path = "data/Desk (under roof).jpg"
 
-# 3. Safely Load and Resize Images to Match Nicely
+# 2. Safely Load and Resize Images to Match Nicely
 try:
     ceiling_img = Image.open(ceiling_path)
     roof_img = Image.open(roof_path)
     
-    # We fix a display width to prevent any image cutting off or misalignment
+    # Fix a display width to prevent any image cutting off or misalignment
     DISPLAY_WIDTH = 600
     
     # Calculate aspect ratio based scaling
@@ -73,7 +42,7 @@ except FileNotFoundError:
     st.error("⚠️ Could not find the image files in the 'data/' folder. Please ensure 'Office Ceiling (Roof).jpg' and 'Desk (under roof).jpg' exist inside your repository.")
     st.stop()
 
-# 4. Create Side-by-Side App Interface
+# 3. Create Side-by-Side App Interface
 col1, col2 = st.columns(2)
 
 with col1:
