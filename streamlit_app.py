@@ -1,18 +1,35 @@
 import sys
 import types
+import streamlit as st
 
-# 1. MONKEY-PATCH: Fix the streamlit-drawable-canvas version error
+# =========================================================================
+# 1. ROBUST MONKEY-PATCH FOR MODERN STREAMLIT COMPATIBILITY
+# =========================================================================
 import streamlit.elements.lib.image_utils as image_utils
+
+# Create a modern mock class that mimics Streamlit's internal layout expectations
+class MockLayoutConfig:
+    def __init__(self, width=None):
+        self.width = width
+
+def patched_image_to_url(data, width, clamp, channels, output_format, image_id):
+    # Bypass the broken internal _ensure_image_size_and_format check by passing our mock layout object
+    mock_layout = MockLayoutConfig(width=width)
+    return image_utils._image_to_url(data, mock_layout, output_format, image_id)
+
+# Force the canvas package to see our fixed version instead
 try:
     import streamlit.elements.image as st_image
-    st_image.image_to_url = image_utils.image_to_url
+    st_image.image_to_url = patched_image_to_url
 except (ImportError, AttributeError):
-    # Dynamically inject the module if it doesn't exist natively
     mod = types.ModuleType("streamlit.elements.image")
-    mod.image_to_url = image_utils.image_to_url
+    mod.image_to_url = patched_image_to_url
     sys.modules["streamlit.elements.image"] = mod
 
-import streamlit as st
+# Force override it globally in image_utils as well just in case
+image_utils.image_to_url = patched_image_to_url
+# =========================================================================
+
 from streamlit_drawable_canvas import st_canvas
 from PIL import Image, ImageDraw
 
