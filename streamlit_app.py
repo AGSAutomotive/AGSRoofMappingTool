@@ -1,11 +1,12 @@
 import streamlit as st
 from PIL import Image, ImageDraw
+from streamlit_image_coordinates import streamlit_image_coordinates
 
 st.set_page_config(layout="wide")
-st.title("Roof Leak Mapping System (Stable Version)")
+st.title("Roof Leak Mapping System (Clickable)")
 
 # -----------------------------
-# PLANT SELECTION
+# PLANTS
 # -----------------------------
 plant = st.selectbox("Select Plant", ["Plant A", "Plant B", "Plant C"])
 
@@ -46,24 +47,24 @@ if "leaks" not in st.session_state:
 col1, col2 = st.columns(2)
 
 # -----------------------------
-# CEILING IMAGE CLICK (NO CANVAS)
+# CLICKABLE CEILING
 # -----------------------------
 with col1:
-    st.subheader("Click to Add Leak (X/Y)")
+    st.subheader("Click Ceiling to Add Leak")
 
-    # Show image
-    st.image(ceiling_img, use_container_width=True)
+    coords = streamlit_image_coordinates(
+        ceiling_img,
+        key=plant
+    )
 
-    st.write("Manually enter leak position (temporary method):")
+    if coords:
+        x, y = coords["x"], coords["y"]
 
-    x = st.number_input("X coordinate", min_value=0, max_value=ceiling_img.width, value=0)
-    y = st.number_input("Y coordinate", min_value=0, max_value=ceiling_img.height, value=0)
-
-    if st.button("Add Leak"):
-        st.session_state.leaks[plant].append((x, y))
+        if len(st.session_state.leaks[plant]) == 0 or st.session_state.leaks[plant][-1] != (x, y):
+            st.session_state.leaks[plant].append((x, y))
 
 # -----------------------------
-# ROOF DISPLAY
+# ROOF OUTPUT
 # -----------------------------
 with col2:
     st.subheader("Roof Plan (Mapped Leaks)")
@@ -79,4 +80,4 @@ with col2:
 # -----------------------------
 # DEBUG
 # -----------------------------
-st.write("Leaks:", st.session_state.leaks[plant])
+st.write("Leak points:", st.session_state.leaks[plant])
