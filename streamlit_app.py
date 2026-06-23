@@ -8,8 +8,8 @@ plant = st.selectbox("Select Plant", ["Plant A", "Plant B", "Plant C"])
 
 plant_data = {
     "Plant A": {"ceiling": "data/plant_a_ceiling.png", "roof": "data/plant_a_roof.png"},
-    "Plant B": {"ceiling": "data/plant_b_ceiling.png", "roof": "data/plant_b_roof.png"},
-    "Plant C": {"ceiling": "data/plant_c_ceiling.png", "roof": "data/plant_c_roof.png"},
+    #"Plant B": {"ceiling": "data/plant_b_ceiling.png", "roof": "data/plant_b_roof.png"},
+    #"Plant C": {"ceiling": "data/plant_c_ceiling.png", "roof": "data/plant_c_roof.png"},
 }
 
 ceiling_img = Image.open(plant_data[plant]["ceiling"]).convert("RGB")
