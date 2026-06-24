@@ -12,7 +12,7 @@ from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 # Set up page layout
 st.set_page_config(page_title="AGS Roof Leak Mapper", layout="wide")
 st.title("🏭 AGS Roof Leak Mapping Tool")
-st.write("Click on the left floor view to add a leak point. Use the dashboard below to manage labels, pull real historical weather logs, and export to Excel.")
+st.write("Click on the left floor view to add a leak point. Use the dashboard below to manage labels, review multi-day storm profiles, and export to Excel.")
 
 # 1. Plant Selection with your specific names
 plant = st.selectbox("Select Manufacturing Plant:", ['Cambridge - 07', 'Oshawa - 04', 'Windsor - 02'])
@@ -21,20 +21,18 @@ plant = st.selectbox("Select Manufacturing Plant:", ['Cambridge - 07', 'Oshawa -
 @st.cache_data(ttl=3600)  # Cache queries to avoid redundant API hits
 def get_real_weather_data(plant_name, target_date):
     """
-    Queries Open-Meteo's Archive API using true coordinates for Ontario plants
+    Queries Open-Meteo's Archive API using the exact user-provided coordinates
     to extract actual measured Temperature Mean and Total Daily Precipitation.
     """
-    # Define exact geographic coordinates for each facility
     coordinates = {
-        'Cambridge - 07': {"lat": 43.3601, "lon": -80.3127},
-        'Oshawa - 04': {"lat": 43.8961, "lon": -78.8570},
-        'Windsor - 02': {"lat": 42.3149, "lon": -83.0364}
+        'Cambridge - 07': {"lat": 43.403449, "lon": -80.322832},
+        'Oshawa - 04': {"lat": 43.876437, "lon": -78.848991},
+        'Windsor - 02': {"lat": 42.286758, "lon": -83.016596}
     }
     
     loc = coordinates.get(plant_name, coordinates['Cambridge - 07'])
     date_str = target_date.strftime("%Y-%m-%d")
     
-    # Open-Meteo Archive API endpoint handles past historical data comprehensively
     url = "https://archive-api.open-meteo.com/v1/archive"
     params = {
         "latitude": loc["lat"],
@@ -53,14 +51,13 @@ def get_real_weather_data(plant_name, target_date):
                 temp_mean = data["daily"]["temperature_2m_mean"][0]
                 precip_sum = data["daily"]["precipitation_sum"][0]
                 
-                # Format None values securely if data hasn't fully processed yet for today
                 t_out = f"{round(temp_mean, 1)}°C" if temp_mean is not None else "N/A"
                 p_out = f"{round(precip_sum, 1)} mm" if precip_sum is not None else "0.0 mm"
                 return t_out, p_out
     except Exception:
         pass
         
-    return "N/A", "N/A" # Fallback gracefully if request fails or date is out of range
+    return "N/A", "N/A"
 
 
 # Image pathways
@@ -150,7 +147,7 @@ with col1:
             'x': clicked_coords['x'],
             'y': clicked_coords['y'],
             'name': f"Leak Point {current_serial}",
-            'start_date': datetime.date.today() - datetime.timedelta(days=1) # Defaults automatically to yesterday
+            'start_date': datetime.date.today()  # Defaults to today when clicked
         })
         
         st.session_state[f"point_counter_{plant_key}"] += 1
@@ -178,12 +175,18 @@ def export_to_excel_with_images(points, left_img_obj, right_img_obj, plant_name)
         top=Side(style='thin', color='BFBFBF'), bottom=Side(style='thin', color='BFBFBF')
     )
     
-    ws.merge_cells("A1:G1")
+    ws.merge_cells("A1:I1")
     ws["A1"] = f"AGS Leak Mapping Report - {plant_name}"
     ws["A1"].font = Font(name="Calibri", size=16, bold=True, color="1F497D")
     ws.row_dimensions[1].height = 30
     
-    headers = ["Point ID", "Custom Label", "Date Discovered", "Real Temp (Mean)", "Real Precipitation", "Coordinate X", "Coordinate Y"]
+    # Updated headers to track Day Before vs Day Noticed separately
+    headers = [
+        "Point ID", "Custom Label", "Date Noticed", 
+        "Weather (Day Before)", "Rain (Day Before)", 
+        "Weather (Day Noticed)", "Rain (Day Noticed)", 
+        "Coordinate X", "Coordinate Y"
+    ]
     for col_idx, header in enumerate(headers, 1):
         cell = ws.cell(row=3, column=col_idx, value=header)
         cell.fill = navy_fill
@@ -197,19 +200,23 @@ def export_to_excel_with_images(points, left_img_obj, right_img_obj, plant_name)
         current_row = start_row + idx
         ws.row_dimensions[current_row].height = 20
         
-        target_date = pt.get('start_date', datetime.date.today())
-        date_str = target_date.strftime("%Y-%m-%d")
-        t_val, p_val = get_real_weather_data(plant_name, target_date)
+        date_noticed = pt.get('start_date', datetime.date.today())
+        date_before = date_noticed - datetime.timedelta(days=1)
+        
+        t_noticed, p_noticed = get_real_weather_data(plant_name, date_noticed)
+        t_before, p_before = get_real_weather_data(plant_name, date_before)
         
         c1 = ws.cell(row=current_row, column=1, value=f"#{pt['serial']}")
         c2 = ws.cell(row=current_row, column=2, value=pt['name'])
-        c3 = ws.cell(row=current_row, column=3, value=date_str)
-        c4 = ws.cell(row=current_row, column=4, value=t_val)
-        c5 = ws.cell(row=current_row, column=5, value=p_val)
-        c6 = ws.cell(row=current_row, column=6, value=int(pt['x']))
-        c7 = ws.cell(row=current_row, column=7, value=int(pt['y']))
+        c3 = ws.cell(row=current_row, column=3, value=date_noticed.strftime("%Y-%m-%d"))
+        c4 = ws.cell(row=current_row, column=4, value=t_before)
+        c5 = ws.cell(row=current_row, column=5, value=p_before)
+        c6 = ws.cell(row=current_row, column=6, value=t_noticed)
+        c7 = ws.cell(row=current_row, column=7, value=p_noticed)
+        c8 = ws.cell(row=current_row, column=8, value=int(pt['x']))
+        c9 = ws.cell(row=current_row, column=9, value=int(pt['y']))
         
-        for cell in [c1, c2, c3, c4, c5, c6, c7]:
+        for cell in [c1, c2, c3, c4, c5, c6, c7, c8, c9]:
             cell.font = regular_font
             cell.border = thin_border
             cell.alignment = Alignment(horizontal="center", vertical="center")
@@ -250,11 +257,21 @@ if not points_list:
 else:
     st.info("💡 **Click to rename:** Click directly inside any text box below to customize the leak label text.")
     
+    # Header labels inside the dashboard grid to make the two weather profiles crystal clear
+    grid_header1, grid_header2, grid_header3, grid_header4, grid_header5, grid_header6 = st.columns([1.2, 2.2, 1.8, 2.2, 2.2, 0.8])
+    with grid_header3:
+        st.caption("📅 Date Noticed")
+    with grid_header4:
+        st.caption("💧 Weather (Day Before)")
+    with grid_header5:
+        st.caption("⛈️ Weather (Day Noticed)")
+
     for index, point in enumerate(points_list):
-        edit_col1, edit_col2, edit_col3, edit_col4, edit_col5 = st.columns([1.5, 3, 2, 2.5, 1.2])
+        # Adjusted width profiles to cleanly host labels, selectors, and two separate weather blocks
+        edit_col1, edit_col2, edit_col3, edit_col4, edit_col5, edit_col6 = st.columns([1.2, 2.2, 1.8, 2.2, 2.2, 0.8])
         
         with edit_col1:
-            st.write(f"**Point #{point['serial']}** (X:{int(point['x'])}, Y:{int(point['y'])})")
+            st.write(f"**#{point['serial']}** ({int(point['x'])}, {int(point['y'])})")
             
         with edit_col2:
             new_name = st.text_input(
@@ -269,9 +286,9 @@ else:
                 
         with edit_col3:
             chosen_date = st.date_input(
-                "Leak Start Date",
-                value=point.get('start_date', datetime.date.today() - datetime.timedelta(days=1)),
-                max_value=datetime.date.today(), # Restrict selecting future impossible dates
+                "Date Leak Noticed",
+                value=point.get('start_date', datetime.date.today()),
+                max_value=datetime.date.today(),
                 key=f"date_{plant_key}_{point['id']}",
                 label_visibility="collapsed"
             )
@@ -279,13 +296,21 @@ else:
                 st.session_state[f"leak_points_{plant_key}"][index]['start_date'] = chosen_date
                 st.rerun()
         
+        # Calculate past dates cleanly for analysis
+        day_before_date = chosen_date - datetime.timedelta(days=1)
+        
         with edit_col4:
-            # Fetches actual recorded meteorological history directly from environment coordinates
-            temp_stamp, precip_stamp = get_real_weather_data(plant, chosen_date)
-            st.markdown(f"🌡️ **{temp_stamp}** &nbsp;&nbsp; 🌧️ **{precip_stamp}**")
-                
+            # Column 4: Weather metrics on the day BEFORE discovery
+            t_before, p_before = get_real_weather_data(plant, day_before_date)
+            st.markdown(f"**{p_before}** ({t_before})")
+            
         with edit_col5:
-            if st.button("🗑️ Delete", key=f"del_{plant_key}_{point['id']}", use_container_width=True):
+            # Column 5: Weather metrics on the active day of discovery
+            t_noticed, p_noticed = get_real_weather_data(plant, chosen_date)
+            st.markdown(f"**{p_noticed}** ({t_noticed})")
+                
+        with edit_col6:
+            if st.button("🗑️", key=f"del_{plant_key}_{point['id']}", use_container_width=True):
                 st.session_state[f"leak_points_{plant_key}"].pop(index)
                 st.rerun()
                 
