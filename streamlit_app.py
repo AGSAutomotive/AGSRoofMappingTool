@@ -26,7 +26,7 @@ st.set_page_config(page_title="AGS Roof Leak Mapper", layout="wide")
 
 st.title("🏭 AGS Roof Leak Mapping Tool")
 
-st.write("Click on the left floor view to add a leak point. Use the dashboard below to manage labels, review multi-day storm profiles, and export to Excel.")
+st.write("Choose plant and click on the left floor view to add a leak point. Use the dashboard below to manage labels and export to Excel.")
 
 
 
@@ -228,7 +228,7 @@ for pt in st.session_state[f"leak_points_{plant_key}"]:
 
     draw_left.ellipse((x - 6, y - 6, x + 6, y + 6), fill="red")
 
-    draw_left.text((x + 8, y - 6), custom_name, fill="yellow")
+    draw_left.text((x + 8, y - 6), custom_name, fill="red")
 
     
 
