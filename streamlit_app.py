@@ -16,7 +16,7 @@ st.write("Click on the left floor view to add a leak point. Use the dashboard be
 
 # 1. Plant Selection with a larger label
 st.markdown("### 🏢 Select Plant:")
-plant = st.selectbox("Select Plant:", ['Cambridge - 07', 'Oshawa - 04', 'Windsor - 02'], label_visibility="collapsed")
+plant = st.selectbox("Select Active Manufacturing Facility:", ['Cambridge - 07', 'Oshawa - 04', 'Windsor - 02'])
 
 # --- 🌤️ LIVE OPEN-METEO WEATHER ENGINE ---
 @st.cache_data(ttl=3600)  # Cache queries to avoid redundant API hits
@@ -185,4 +185,147 @@ def export_to_excel_with_images(points, left_img_obj, right_img_obj, plant_name)
     ]
     for col_idx, header in enumerate(headers, 1):
         cell = ws.cell(row=3, column=col_idx, value=header)
-        cell
+        cell.fill = navy_fill
+        cell.font = white_bold
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+        cell.border = thin_border
+    ws.row_dimensions[3].height = 24
+    
+    start_row = 4
+    for idx, pt in enumerate(points):
+        current_row = start_row + idx
+        ws.row_dimensions[current_row].height = 20
+        
+        date_noticed = pt.get('start_date', datetime.date.today())
+        date_before = date_noticed - datetime.timedelta(days=1)
+        
+        t_noticed, p_noticed = get_real_weather_data(plant_name, date_noticed)
+        t_before, p_before = get_real_weather_data(plant_name, date_before)
+        
+        c1 = ws.cell(row=current_row, column=1, value=f"#{pt['serial']}")
+        c2 = ws.cell(row=current_row, column=2, value=pt['name'])
+        c3 = ws.cell(row=current_row, column=3, value=date_noticed.strftime("%Y-%m-%d"))
+        c4 = ws.cell(row=current_row, column=4, value=p_noticed)
+        c5 = ws.cell(row=current_row, column=5, value=t_noticed)
+        c6 = ws.cell(row=current_row, column=6, value=p_before)
+        c7 = ws.cell(row=current_row, column=7, value=t_before)
+        c8 = ws.cell(row=current_row, column=8, value=int(pt['x']))
+        c9 = ws.cell(row=current_row, column=9, value=int(pt['y']))
+        
+        for cell in [c1, c2, c3, c4, c5, c6, c7, c8, c9]:
+            cell.font = regular_font
+            cell.border = thin_border
+            cell.alignment = Alignment(horizontal="center", vertical="center")
+            
+    for col in ws.columns:
+        max_len = max(len(str(cell.value or '')) for cell in col)
+        col_letter = openpyxl.utils.get_column_letter(col[0].column)
+        ws.column_dimensions[col_letter].width = max(max_len + 4, 15)
+        
+    image_heading_row = start_row + len(points) + 2
+    ws.cell(row=image_heading_row, column=1, value="🗺️ Final Marked Floor Map View").font = navy_bold
+    ws.cell(row=image_heading_row, column=6, value="🦅 Final Corresponding Roof View").font = navy_bold
+    
+    left_buffer, right_buffer = io.BytesIO(), io.BytesIO()
+    left_img_obj.resize((450, int(left_img_obj.height * (450/left_img_obj.width)))).save(left_buffer, format="JPEG")
+    right_img_obj.resize((450, int(right_img_obj.height * (450/right_img_obj.width)))).save(right_buffer, format="JPEG")
+    
+    left_buffer.seek(0)
+    right_buffer.seek(0)
+    
+    ws.add_image(OpenpyxlImage(left_buffer), f"A{image_heading_row + 1}")
+    ws.add_image(OpenpyxlImage(right_buffer), f"F{image_heading_row + 1}")
+    
+    output_stream = io.BytesIO()
+    wb.save(output_stream)
+    output_stream.seek(0)
+    return output_stream
+
+
+# --- 📋 TRACKING DASHBOARD ---
+st.write("---")
+st.subheader("📋 Saved Leak Records Dashboard")
+
+points_list = st.session_state[f"leak_points_{plant_key}"]
+
+if not points_list:
+    st.info(f"💡 No leaks mapped yet for {plant}. Click on the left Floor Map image to begin pinning locations.")
+else:
+    st.info("💡 **Click to edit:** You can type directly in the boxes below to rename points or update dates.")
+    
+    grid_header1, grid_header2, grid_header3, grid_header4, grid_header5, grid_header6 = st.columns([1.0, 2.2, 1.8, 2.3, 2.3, 1.4])
+    with grid_header1: st.markdown("**ID**")
+    with grid_header2: st.markdown("**🏷️ Custom Label Name**")
+    with grid_header3: st.markdown("**📅 Date Noticed**")
+    with grid_header4: st.markdown("**🌦️ Precip (Day Noticed)**")
+    with grid_header5: st.markdown("**🌦️ Precip (Day Before)**")
+    with grid_header6: st.markdown("**Action**")
+
+    for index, point in enumerate(points_list):
+        edit_col1, edit_col2, edit_col3, edit_col4, edit_col5, edit_col6 = st.columns([1.0, 2.2, 1.8, 2.3, 2.3, 1.4])
+        
+        with edit_col1:
+            st.write(f"**#{point['serial']}**")
+            
+        with edit_col2:
+            new_name = st.text_input(
+                "Label Text", 
+                value=point['name'], 
+                key=f"rename_{plant_key}_{point['id']}"
+            )
+            if new_name != point['name']:
+                st.session_state[f"leak_points_{plant_key}"][index]['name'] = new_name
+                st.rerun()
+                
+        with edit_col3:
+            chosen_date = st.date_input(
+                "Calendar Date",
+                value=point.get('start_date', datetime.date.today()),
+                max_value=datetime.date.today(),
+                key=f"date_{plant_key}_{point['id']}"
+            )
+            if chosen_date != point.get('start_date'):
+                st.session_state[f"leak_points_{plant_key}"][index]['start_date'] = chosen_date
+                st.rerun()
+        
+        day_before_date = chosen_date - datetime.timedelta(days=1)
+        
+        with edit_col4:
+            t_noticed, p_noticed = get_real_weather_data(plant, chosen_date)
+            st.markdown(f"**{p_noticed}** ({t_noticed})")
+            
+        with edit_col5:
+            t_before, p_before = get_real_weather_data(plant, day_before_date)
+            st.markdown(f"**{p_before}** ({t_before})")
+                
+        with edit_col6:
+            st.write("") # Add visual alignment spacing
+            if st.button("🗑️ Delete", key=f"del_{plant_key}_{point['id']}", use_container_width=True):
+                # 1. Drop the selected point from state memory
+                st.session_state[f"leak_points_{plant_key}"].pop(index)
+                
+                # 2. Loop back through remaining items to shift rankings and update labels cleanly
+                for new_idx, remaining_point in enumerate(st.session_state[f"leak_points_{plant_key}"]):
+                    old_serial = remaining_point['serial']
+                    new_serial = new_idx + 1
+                    
+                    # Update order index
+                    st.session_state[f"leak_points_{plant_key}"][new_idx]['serial'] = new_serial
+                    
+                    # If label was never customized, rename it to maintain clean default numbers
+                    if remaining_point['name'] == f"Leak Point {old_serial}":
+                        st.session_state[f"leak_points_{plant_key}"][new_idx]['name'] = f"Leak Point {new_serial}"
+                
+                st.rerun()
+                
+    st.write("---")
+    st.markdown("### 📤 Export Layout Data")
+    excel_data = export_to_excel_with_images(points_list, left_display, right_display, plant)
+    
+    st.download_button(
+        label="📥 Download Data & Maps to Excel (.xlsx)",
+        data=excel_data,
+        file_name=f"AGS_Leak_Report_{plant_key}.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        use_container_width=True
+    )
