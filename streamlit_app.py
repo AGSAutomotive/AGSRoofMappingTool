@@ -15,7 +15,7 @@ st.title("🏭 AGS Roof Leak Mapping Tool")
 st.info("💡 Choose plant and click on the left floor view to add a leak point. Use the dashboard below to manage labels and export to Excel.")
 
 # 1. Plant Selection with your specific names
-plant = st.selectbox("Select Manufacturing Plant:", ['Cambridge - 07', 'Oshawa - 04', 'Windsor - 02'])
+plant = st.selectbox("Select Plant:", ['Cambridge - 07', 'Oshawa - 04', 'Windsor - 02'])
 
 # --- 🌤️ LIVE OPEN-METEO WEATHER ENGINE ---
 @st.cache_data(ttl=3600)  # Cache queries to avoid redundant API hits
@@ -149,56 +149,4 @@ with col1:
             'serial': current_serial,
             'x': clicked_coords['x'],
             'y': clicked_coords['y'],
-            'name': f"Leak Point {current_serial}",
-            'start_date': datetime.date.today()
-        })
-        st.rerun()
-
-with col2:
-    st.markdown("### 🦅 Corresponding Roof View")
-    st.image(right_display, use_container_width=False)
-
-
-# --- EXCEL GENERATION ---
-def export_to_excel_with_images(points, left_img_obj, right_img_obj, plant_name):
-    wb = openpyxl.Workbook()
-    ws = wb.active
-    ws.title = "Leak Mapping Report"
-    ws.views.sheetView[0].showGridLines = True
-    
-    navy_fill = PatternFill(start_color="1F497D", end_color="1F497D", fill_type="solid")
-    white_bold = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
-    navy_bold = Font(name="Calibri", size=11, bold=True, color="1F497D")
-    regular_font = Font(name="Calibri", size=11)
-    
-    thin_border = Border(
-        left=Side(style='thin', color='BFBFBF'), right=Side(style='thin', color='BFBFBF'),
-        top=Side(style='thin', color='BFBFBF'), bottom=Side(style='thin', color='BFBFBF')
-    )
-    
-    ws.merge_cells("A1:I1")
-    ws["A1"] = f"AGS Leak Mapping Report - {plant_name}"
-    ws["A1"].font = Font(name="Calibri", size=16, bold=True, color="1F497D")
-    ws.row_dimensions[1].height = 30
-    
-    headers = [
-        "Point ID", "Custom Label", "Date Noticed", 
-        "Precipitation (Day Noticed)", "Temp (Day Noticed)",
-        "Precipitation (Day Before)", "Temp (Day Before)",
-        "Coordinate X", "Coordinate Y"
-    ]
-    for col_idx, header in enumerate(headers, 1):
-        cell = ws.cell(row=3, column=col_idx, value=header)
-        cell.fill = navy_fill
-        cell.font = white_bold
-        cell.alignment = Alignment(horizontal="center", vertical="center")
-        cell.border = thin_border
-    ws.row_dimensions[3].height = 24
-    
-    start_row = 4
-    for idx, pt in enumerate(points):
-        current_row = start_row + idx
-        ws.row_dimensions[current_row].height = 20
-        
-        date_noticed = pt.get('start_date', datetime.date.today())
-        date_before = date_noticed - datetime.timedelta
+            '
