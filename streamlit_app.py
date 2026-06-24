@@ -19,10 +19,10 @@ plant = st.selectbox("Select Manufacturing Plant:", ['Cambridge - 07', 'Oshawa -
 
 # --- 🌤️ LIVE OPEN-METEO WEATHER ENGINE ---
 @st.cache_data(ttl=3600)  # Cache queries to avoid redundant API hits
-def get_real_weather_data(plant_name, target_date):
+def get_real_precipitation_data(plant_name, target_date):
     """
     Queries Open-Meteo's Archive API using the exact user-provided coordinates
-    to extract actual measured Temperature Mean and Total Daily Precipitation.
+    to extract actual measured Total Daily Precipitation in mm.
     """
     coordinates = {
         'Cambridge - 07': {"lat": 43.403449, "lon": -80.322832},
@@ -39,7 +39,7 @@ def get_real_weather_data(plant_name, target_date):
         "longitude": loc["lon"],
         "start_date": date_str,
         "end_date": date_str,
-        "daily": ["temperature_2m_mean", "precipitation_sum"],
+        "daily": ["precipitation_sum"],
         "timezone": "America/New_York"
     }
     
@@ -48,16 +48,13 @@ def get_real_weather_data(plant_name, target_date):
         if response.status_code == 200:
             data = response.json()
             if "daily" in data:
-                temp_mean = data["daily"]["temperature_2m_mean"][0]
                 precip_sum = data["daily"]["precipitation_sum"][0]
-                
-                t_out = f"{round(temp_mean, 1)}°C" if temp_mean is not None else "N/A"
                 p_out = f"{round(precip_sum, 1)} mm" if precip_sum is not None else "0.0 mm"
-                return t_out, p_out
+                return p_out
     except Exception:
         pass
         
-    return "N/A", "N/A"
+    return "N/A"
 
 
 # Image pathways
@@ -175,16 +172,15 @@ def export_to_excel_with_images(points, left_img_obj, right_img_obj, plant_name)
         top=Side(style='thin', color='BFBFBF'), bottom=Side(style='thin', color='BFBFBF')
     )
     
-    ws.merge_cells("A1:I1")
+    ws.merge_cells("A1:G1")
     ws["A1"] = f"AGS Leak Mapping Report - {plant_name}"
     ws["A1"].font = Font(name="Calibri", size=16, bold=True, color="1F497D")
     ws.row_dimensions[1].height = 30
     
-    # Excel columns switched layout to maintain visual flow mirroring web app layout
+    # Renamed Excel header layouts cleanly to track pure Rain/Precip totals
     headers = [
         "Point ID", "Custom Label", "Date Noticed", 
-        "Weather (Day Noticed)", "Rain (Day Noticed)", 
-        "Weather (Day Before)", "Rain (Day Before)", 
+        "Precipitation (Day Noticed)", "Precipitation (Day Before)", 
         "Coordinate X", "Coordinate Y"
     ]
     for col_idx, header in enumerate(headers, 1):
@@ -203,20 +199,18 @@ def export_to_excel_with_images(points, left_img_obj, right_img_obj, plant_name)
         date_noticed = pt.get('start_date', datetime.date.today())
         date_before = date_noticed - datetime.timedelta(days=1)
         
-        t_noticed, p_noticed = get_real_weather_data(plant_name, date_noticed)
-        t_before, p_before = get_real_weather_data(plant_name, date_before)
+        p_noticed = get_real_precipitation_data(plant_name, date_noticed)
+        p_before = get_real_precipitation_data(plant_name, date_before)
         
         c1 = ws.cell(row=current_row, column=1, value=f"#{pt['serial']}")
         c2 = ws.cell(row=current_row, column=2, value=pt['name'])
         c3 = ws.cell(row=current_row, column=3, value=date_noticed.strftime("%Y-%m-%d"))
-        c4 = ws.cell(row=current_row, column=4, value=t_noticed)
-        c5 = ws.cell(row=current_row, column=5, value=p_noticed)
-        c6 = ws.cell(row=current_row, column=6, value=t_before)
-        c7 = ws.cell(row=current_row, column=7, value=p_before)
-        c8 = ws.cell(row=current_row, column=8, value=int(pt['x']))
-        c9 = ws.cell(row=current_row, column=9, value=int(pt['y']))
+        c4 = ws.cell(row=current_row, column=4, value=p_noticed)
+        c5 = ws.cell(row=current_row, column=5, value=p_before)
+        c6 = ws.cell(row=current_row, column=6, value=int(pt['x']))
+        c7 = ws.cell(row=current_row, column=7, value=int(pt['y']))
         
-        for cell in [c1, c2, c3, c4, c5, c6, c7, c8, c9]:
+        for cell in [c1, c2, c3, c4, c5, c6, c7]:
             cell.font = regular_font
             cell.border = thin_border
             cell.alignment = Alignment(horizontal="center", vertical="center")
@@ -257,21 +251,19 @@ if not points_list:
 else:
     st.info("💡 **Click to rename:** Click directly inside any text box below to customize the leak label text.")
     
-    # Redefined responsive grid header widths for clean alignment
-    grid_header1, grid_header2, grid_header3, grid_header4, grid_header5, grid_header6 = st.columns([1.0, 2.2, 1.8, 2.2, 2.2, 1.4])
+    # Grid columns with bold markdown titles to create darker headers
+    grid_header1, grid_header2, grid_header3, grid_header4, grid_header5, grid_header6 = st.columns([1.0, 2.2, 1.8, 2.3, 2.3, 1.4])
     with grid_header3:
-        st.caption("📅 Date Noticed")
+        st.markdown("**📅 Date Noticed**")
     with grid_header4:
-        st.caption("⛈️ Weather (Day Noticed)")
+        st.markdown("**💧 Precipitation (Day Noticed)**")
     with grid_header5:
-        st.caption("💧 Weather (Day Before)")
+        st.markdown("**💧 Precipitation (Day Before)**")
 
     for index, point in enumerate(points_list):
-        # Layout metrics optimized to support the larger text delete buttons seamlessly
-        edit_col1, edit_col2, edit_col3, edit_col4, edit_col5, edit_col6 = st.columns([1.0, 2.2, 1.8, 2.2, 2.2, 1.4])
+        edit_col1, edit_col2, edit_col3, edit_col4, edit_col5, edit_col6 = st.columns([1.0, 2.2, 1.8, 2.3, 2.3, 1.4])
         
         with edit_col1:
-            # Clean view layout - Coordinates stripped from display header
             st.write(f"**#{point['serial']}**")
             
         with edit_col2:
@@ -300,17 +292,16 @@ else:
         day_before_date = chosen_date - datetime.timedelta(days=1)
         
         with edit_col4:
-            # Weather metrics for the day it was NOTICED (Moved to left position)
-            t_noticed, p_noticed = get_real_weather_data(plant, chosen_date)
-            st.markdown(f"**{p_noticed}** ({t_noticed})")
+            # Displays pure rain value for active day noticed
+            p_noticed = get_real_precipitation_data(plant, chosen_date)
+            st.markdown(f"**{p_noticed}**")
             
         with edit_col5:
-            # Weather metrics for the day BEFORE it was noticed (Moved to right position)
-            t_before, p_before = get_real_weather_data(plant, day_before_date)
-            st.markdown(f"**{p_before}** ({t_before})")
+            # Displays pure rain value for the day before
+            p_before = get_real_precipitation_data(plant, day_before_date)
+            st.markdown(f"**{p_before}**")
                 
         with edit_col6:
-            # Expanded button block providing visibility for full title string
             if st.button("🗑️ Delete", key=f"del_{plant_key}_{point['id']}", use_container_width=True):
                 st.session_state[f"leak_points_{plant_key}"].pop(index)
                 st.rerun()
