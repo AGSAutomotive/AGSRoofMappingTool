@@ -26,7 +26,7 @@ st.set_page_config(page_title="AGS Roof Leak Mapper", layout="wide")
 
 st.title("🏭 AGS Roof Leak Mapping Tool")
 
-st.write("Choose plant and click on the left floor view to add a leak point. Use the dashboard below to manage labels and export to Excel.")
+st.info("Choose plant and click on the left floor view to add a leak point. Use the dashboard below to manage labels and export to Excel.")
 
 
 
@@ -502,7 +502,7 @@ if not points_list:
 
 else:
 
-    st.info("💡 **Click to rename:** Click directly inside any text box below to customize the leak label text.")
+    st.info("💡 **Click to rename:** Click directly inside any text box below to customize labels and sleect dates.")
 
     
 
