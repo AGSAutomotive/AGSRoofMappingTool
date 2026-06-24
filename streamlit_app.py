@@ -255,7 +255,7 @@ points_list = st.session_state[f"leak_points_{plant_key}"]
 if not points_list:
     st.info(f"💡 No leaks mapped yet for {plant}. Click on the left Floor Map image to begin pinning locations.")
 else:
-    st.info("💡 **Click to rename:** Click directly inside any text box below to customize labels and sleect dates.")
+    st.info("💡 **Click to rename:** Click directly inside any text box below to customize labels and select dates.")
     
     grid_header1, grid_header2, grid_header3, grid_header4, grid_header5, grid_header6 = st.columns([1.0, 2.2, 1.8, 2.3, 2.3, 1.4])
     with grid_header3:
