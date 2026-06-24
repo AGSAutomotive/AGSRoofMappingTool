@@ -96,9 +96,6 @@ plant_key = plant.replace(' ', '_').replace('-', '_')
 if f"leak_points_{plant_key}" not in st.session_state:
     st.session_state[f"leak_points_{plant_key}"] = []
 
-if f"point_counter_{plant_key}" not in st.session_state:
-    st.session_state[f"point_counter_{plant_key}"] = 1
-
 if f"last_click_{plant_key}" not in st.session_state:
     st.session_state[f"last_click_{plant_key}"] = None
 
@@ -138,7 +135,8 @@ with col1:
     if clicked_coords is not None and clicked_coords != st.session_state[f"last_click_{plant_key}"]:
         st.session_state[f"last_click_{plant_key}"] = clicked_coords
         
-        current_serial = st.session_state[f"point_counter_{plant_key}"]
+        # Calculate the next active number directly from current list size
+        current_serial = len(st.session_state[f"leak_points_{plant_key}"]) + 1
         unique_timestamp_id = str(time.time()).replace(".", "")
         
         st.session_state[f"leak_points_{plant_key}"].append({
@@ -149,8 +147,6 @@ with col1:
             'name': f"Leak Point {current_serial}",
             'start_date': datetime.date.today()
         })
-        
-        st.session_state[f"point_counter_{plant_key}"] += 1
         st.rerun()
 
 with col2:
@@ -256,7 +252,6 @@ if not points_list:
 else:
     st.info("💡 **Click to rename:** Click directly inside any text box below to customize the leak label text.")
     
-    # Custom Leak Label header removed. Column widths adjusted to balance the spacing cleanly.
     grid_header1, grid_header2, grid_header3, grid_header4, grid_header5, grid_header6 = st.columns([1.0, 2.2, 1.8, 2.3, 2.3, 1.4])
     with grid_header3:
         st.markdown("**📅 Date Noticed**")
@@ -306,7 +301,21 @@ else:
                 
         with edit_col6:
             if st.button("🗑️ Delete", key=f"del_{plant_key}_{point['id']}", use_container_width=True):
+                # 1. Drop the selected point from state memory
                 st.session_state[f"leak_points_{plant_key}"].pop(index)
+                
+                # 2. Loop back through remaining items to shift rankings and update labels cleanly
+                for new_idx, remaining_point in enumerate(st.session_state[f"leak_points_{plant_key}"]):
+                    old_serial = remaining_point['serial']
+                    new_serial = new_idx + 1
+                    
+                    # Update order index
+                    st.session_state[f"leak_points_{plant_key}"][new_idx]['serial'] = new_serial
+                    
+                    # If label was never customized, rename it to maintain clean default numbers
+                    if remaining_point['name'] == f"Leak Point {old_serial}":
+                        st.session_state[f"leak_points_{plant_key}"][new_idx]['name'] = f"Leak Point {new_serial}"
+                
                 st.rerun()
                 
     st.write("---")
