@@ -26,13 +26,13 @@ st.set_page_config(page_title="AGS Roof Leak Mapper", layout="wide")
 
 st.title("🏭 AGS Roof Leak Mapping Tool")
 
-st.info("Choose plant and click on the left floor view to add a leak point. Use the dashboard below to manage labels and export to Excel.")
+st.info("💡 Choose plant and click on the left floor view to add a leak point. Use the dashboard below to manage labels and export to Excel.")
 
 
 
 # 1. Plant Selection with your specific names
 
-plant = st.selectbox("Select Manufacturing Plant:", ['Cambridge - 07', 'Oshawa - 04', 'Windsor - 02'])
+plant = st.selectbox("Select Plant:", ['Cambridge - 07', 'Oshawa - 04', 'Windsor - 02'])
 
 
 
