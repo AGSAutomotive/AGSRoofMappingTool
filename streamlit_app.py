@@ -187,13 +187,15 @@ def export_to_excel_with_images(points, left_img_obj, right_img_obj, plant_name)
 # --- 📋 TRACKING DASHBOARD ---
 st.write("---")
 st.subheader("📋 Saved Leak Records Dashboard")
-st.info("💡 **Click to rename:** Click directly inside any text box below to customize the leak label text.")
 
 points_list = st.session_state[f"leak_points_{plant_key}"]
 
 if not points_list:
     st.info(f"💡 No leaks mapped yet for {plant}. Click on the left Floor Map image to begin pinning locations.")
 else:
+    # NEW: The tip message is wrapped inside the condition and ONLY renders if points exist (i.e., a point has been clicked)
+    st.info("💡 **Click to rename:** Click directly inside any text box below to customize the leak label text.")
+    
     for index, point in enumerate(points_list):
         edit_col1, edit_col2, edit_col3 = st.columns([1.5, 3, 2])
         
