@@ -140,4 +140,49 @@ with col1:
         current_serial = len(st.session_state[f"leak_points_{plant_key}"]) + 1
         unique_timestamp_id = str(time.time()).replace(".", "")
         
-        st.session_state
+        st.session_state[f"leak_points_{plant_key}"].append({
+            'id': unique_timestamp_id,
+            'serial': current_serial,
+            'x': clicked_coords['x'],
+            'y': clicked_coords['y'],
+            'name': f"Leak Point {current_serial}",
+            'start_date': datetime.date.today()
+        })
+        st.rerun()
+
+with col2:
+    st.markdown("### 🦅 Corresponding Roof View")
+    st.image(right_display, use_container_width=False)
+
+
+# --- EXCEL GENERATION ---
+def export_to_excel_with_images(points, left_img_obj, right_img_obj, plant_name):
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Leak Mapping Report"
+    ws.views.sheetView[0].showGridLines = True
+    
+    navy_fill = PatternFill(start_color="1F497D", end_color="1F497D", fill_type="solid")
+    white_bold = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
+    navy_bold = Font(name="Calibri", size=11, bold=True, color="1F497D")
+    regular_font = Font(name="Calibri", size=11)
+    
+    thin_border = Border(
+        left=Side(style='thin', color='BFBFBF'), right=Side(style='thin', color='BFBFBF'),
+        top=Side(style='thin', color='BFBFBF'), bottom=Side(style='thin', color='BFBFBF')
+    )
+    
+    ws.merge_cells("A1:I1")
+    ws["A1"] = f"AGS Leak Mapping Report - {plant_name}"
+    ws["A1"].font = Font(name="Calibri", size=16, bold=True, color="1F497D")
+    ws.row_dimensions[1].height = 30
+    
+    headers = [
+        "Point ID", "Custom Label", "Date Noticed", 
+        "Precipitation (Day Noticed)", "Temp (Day Noticed)",
+        "Precipitation (Day Before)", "Temp (Day Before)",
+        "Coordinate X", "Coordinate Y"
+    ]
+    for col_idx, header in enumerate(headers, 1):
+        cell = ws.cell(row=3, column=col_idx, value=header)
+        cell
