@@ -4,6 +4,7 @@ from PIL import Image, ImageDraw
 import time
 import io
 import datetime
+import requests
 import openpyxl
 from openpyxl.drawing.image import Image as OpenpyxlImage
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
@@ -11,10 +12,56 @@ from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 # Set up page layout
 st.set_page_config(page_title="AGS Roof Leak Mapper", layout="wide")
 st.title("🏭 AGS Roof Leak Mapping Tool")
-st.write("Click on the left floor view to add a leak point. Use the dashboard below to manage labels, select dates, and export everything directly to Excel.")
+st.write("Click on the left floor view to add a leak point. Use the dashboard below to manage labels, pull real historical weather logs, and export to Excel.")
 
 # 1. Plant Selection with your specific names
 plant = st.selectbox("Select Manufacturing Plant:", ['Cambridge - 07', 'Oshawa - 04', 'Windsor - 02'])
+
+# --- 🌤️ LIVE OPEN-METEO WEATHER ENGINE ---
+@st.cache_data(ttl=3600)  # Cache queries to avoid redundant API hits
+def get_real_weather_data(plant_name, target_date):
+    """
+    Queries Open-Meteo's Archive API using true coordinates for Ontario plants
+    to extract actual measured Temperature Mean and Total Daily Precipitation.
+    """
+    # Define exact geographic coordinates for each facility
+    coordinates = {
+        'Cambridge - 07': {"lat": 43.3601, "lon": -80.3127},
+        'Oshawa - 04': {"lat": 43.8961, "lon": -78.8570},
+        'Windsor - 02': {"lat": 42.3149, "lon": -83.0364}
+    }
+    
+    loc = coordinates.get(plant_name, coordinates['Cambridge - 07'])
+    date_str = target_date.strftime("%Y-%m-%d")
+    
+    # Open-Meteo Archive API endpoint handles past historical data comprehensively
+    url = "https://archive-api.open-meteo.com/v1/archive"
+    params = {
+        "latitude": loc["lat"],
+        "longitude": loc["lon"],
+        "start_date": date_str,
+        "end_date": date_str,
+        "daily": ["temperature_2m_mean", "precipitation_sum"],
+        "timezone": "America/New_York"
+    }
+    
+    try:
+        response = requests.get(url, params=params, timeout=5)
+        if response.status_code == 200:
+            data = response.json()
+            if "daily" in data:
+                temp_mean = data["daily"]["temperature_2m_mean"][0]
+                precip_sum = data["daily"]["precipitation_sum"][0]
+                
+                # Format None values securely if data hasn't fully processed yet for today
+                t_out = f"{round(temp_mean, 1)}°C" if temp_mean is not None else "N/A"
+                p_out = f"{round(precip_sum, 1)} mm" if precip_sum is not None else "0.0 mm"
+                return t_out, p_out
+    except Exception:
+        pass
+        
+    return "N/A", "N/A" # Fallback gracefully if request fails or date is out of range
+
 
 # Image pathways
 if plant == "Cambridge - 07":
@@ -84,7 +131,6 @@ st.write("---")
 col1, col2 = st.columns([1, 1])
 
 with col1:
-    # Plant label placed directly above the image view
     st.markdown(f"### 🗺️ Floor Map View — **{plant}**")
     
     clicked_coords = streamlit_image_coordinates(
@@ -98,14 +144,13 @@ with col1:
         current_serial = st.session_state[f"point_counter_{plant_key}"]
         unique_timestamp_id = str(time.time()).replace(".", "")
         
-        # Storing today's date as the default start date baseline
         st.session_state[f"leak_points_{plant_key}"].append({
             'id': unique_timestamp_id,
             'serial': current_serial,
             'x': clicked_coords['x'],
             'y': clicked_coords['y'],
             'name': f"Leak Point {current_serial}",
-            'start_date': datetime.date.today()
+            'start_date': datetime.date.today() - datetime.timedelta(days=1) # Defaults automatically to yesterday
         })
         
         st.session_state[f"point_counter_{plant_key}"] += 1
@@ -133,13 +178,12 @@ def export_to_excel_with_images(points, left_img_obj, right_img_obj, plant_name)
         top=Side(style='thin', color='BFBFBF'), bottom=Side(style='thin', color='BFBFBF')
     )
     
-    ws.merge_cells("A1:E1")
+    ws.merge_cells("A1:G1")
     ws["A1"] = f"AGS Leak Mapping Report - {plant_name}"
     ws["A1"].font = Font(name="Calibri", size=16, bold=True, color="1F497D")
     ws.row_dimensions[1].height = 30
     
-    # Added "Date Discovered" to Excel Headers
-    headers = ["Point ID", "Custom Label", "Date Discovered", "Coordinate X", "Coordinate Y"]
+    headers = ["Point ID", "Custom Label", "Date Discovered", "Real Temp (Mean)", "Real Precipitation", "Coordinate X", "Coordinate Y"]
     for col_idx, header in enumerate(headers, 1):
         cell = ws.cell(row=3, column=col_idx, value=header)
         cell.fill = navy_fill
@@ -153,15 +197,19 @@ def export_to_excel_with_images(points, left_img_obj, right_img_obj, plant_name)
         current_row = start_row + idx
         ws.row_dimensions[current_row].height = 20
         
-        date_str = pt.get('start_date', datetime.date.today()).strftime("%Y-%m-%d")
+        target_date = pt.get('start_date', datetime.date.today())
+        date_str = target_date.strftime("%Y-%m-%d")
+        t_val, p_val = get_real_weather_data(plant_name, target_date)
         
         c1 = ws.cell(row=current_row, column=1, value=f"#{pt['serial']}")
         c2 = ws.cell(row=current_row, column=2, value=pt['name'])
         c3 = ws.cell(row=current_row, column=3, value=date_str)
-        c4 = ws.cell(row=current_row, column=4, value=int(pt['x']))
-        c5 = ws.cell(row=current_row, column=5, value=int(pt['y']))
+        c4 = ws.cell(row=current_row, column=4, value=t_val)
+        c5 = ws.cell(row=current_row, column=5, value=p_val)
+        c6 = ws.cell(row=current_row, column=6, value=int(pt['x']))
+        c7 = ws.cell(row=current_row, column=7, value=int(pt['y']))
         
-        for cell in [c1, c2, c3, c4, c5]:
+        for cell in [c1, c2, c3, c4, c5, c6, c7]:
             cell.font = regular_font
             cell.border = thin_border
             cell.alignment = Alignment(horizontal="center", vertical="center")
@@ -203,8 +251,7 @@ else:
     st.info("💡 **Click to rename:** Click directly inside any text box below to customize the leak label text.")
     
     for index, point in enumerate(points_list):
-        # Adjusted columns to split layout cleanly for the label, the date selector, and the delete button
-        edit_col1, edit_col2, edit_col3, edit_col4 = st.columns([1.5, 3, 2, 1.5])
+        edit_col1, edit_col2, edit_col3, edit_col4, edit_col5 = st.columns([1.5, 3, 2, 2.5, 1.2])
         
         with edit_col1:
             st.write(f"**Point #{point['serial']}** (X:{int(point['x'])}, Y:{int(point['y'])})")
@@ -221,18 +268,23 @@ else:
                 st.rerun()
                 
         with edit_col3:
-            # Inline Calendar Selector right next to the text field
             chosen_date = st.date_input(
                 "Leak Start Date",
-                value=point.get('start_date', datetime.date.today()),
+                value=point.get('start_date', datetime.date.today() - datetime.timedelta(days=1)),
+                max_value=datetime.date.today(), # Restrict selecting future impossible dates
                 key=f"date_{plant_key}_{point['id']}",
                 label_visibility="collapsed"
             )
             if chosen_date != point.get('start_date'):
                 st.session_state[f"leak_points_{plant_key}"][index]['start_date'] = chosen_date
                 st.rerun()
-                
+        
         with edit_col4:
+            # Fetches actual recorded meteorological history directly from environment coordinates
+            temp_stamp, precip_stamp = get_real_weather_data(plant, chosen_date)
+            st.markdown(f"🌡️ **{temp_stamp}** &nbsp;&nbsp; 🌧️ **{precip_stamp}**")
+                
+        with edit_col5:
             if st.button("🗑️ Delete", key=f"del_{plant_key}_{point['id']}", use_container_width=True):
                 st.session_state[f"leak_points_{plant_key}"].pop(index)
                 st.rerun()
