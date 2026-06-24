@@ -62,14 +62,14 @@ def get_real_weather_data(plant_name, target_date):
 
 # Image pathways
 if plant == "Cambridge - 07":
-    left_path = "data/Desk (under roof).jpg"
-    right_path = "data/Office Ceiling (Roof).jpg"
+    left_path = "data/CambridgeCAD.png"
+    right_path = "data/Cambridge.png"
 elif plant == "Oshawa - 04":
-    left_path = "data/Desk (under roof).jpg"
-    right_path = "data/Office Ceiling (Roof).jpg"
+    left_path = "data/OshawaCAD.png"
+    right_path = "data/Oshawa.png"
 else:
-    left_path = "data/Desk (under roof).jpg"
-    right_path = "data/Office Ceiling (Roof).jpg"
+    left_path = "data/WindsorCAD.png"
+    right_path = "data/Windsor.png"
 
 # 2. Load and Resize Images to a stable layout width (600px)
 try:
