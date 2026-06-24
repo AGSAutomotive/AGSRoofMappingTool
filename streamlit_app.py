@@ -118,7 +118,7 @@ for pt in st.session_state[f"leak_points_{plant_key}"]:
     # Draw Right View Pins
     draw_right.ellipse((x - 12, y - 12, x + 12, y + 12), outline="cyan", width=3)
     draw_right.ellipse((x - 3, y - 3, x + 3, y + 3), fill="red")
-    draw_right.text((x + 14, y - 12), custom_name, fill="magenta")
+    draw_right.text((x + 14, y - 12), custom_name, fill="yellow")
 
 # 4. Display Side-by-Side Views
 st.write("---")
