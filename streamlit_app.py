@@ -156,7 +156,7 @@ else:
 # --- 🚀 SUBMIT ENGINE TRANSMISSION BLOCK ---
 if st.session_state["new_pins_batch"]:
     st.write("---")
-    st.info("Once all new leaks are plotted, click 'Report Leaks" below to save.")
+    st.info("Once all new leaks are plotted, click 'Report Leaks' button below to save.")
     if st.button("🚀 Report Leaks", type="primary", use_container_width=True):
         with st.spinner("Uploading and updating consolidated overview maps..."):
             # Compress and encode the transparent overlay matrix into Png format (to preserve alpha layers)
