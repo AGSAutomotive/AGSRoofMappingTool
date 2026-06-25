@@ -8,7 +8,7 @@ import requests
 import base64
 
 # ------------------------------------------------------------------
-# CONFIGURATION: Your live Power Automate URL is embedded here
+# CONFIGURATION: Your authenticated live Power Automate URL
 # ------------------------------------------------------------------
 POWER_AUTOMATE_URL = "https://default9b2f9cbe865b4df8a5848494d8c1ef.f6.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/47ed5cfbda7d44a3a9ca56f439adaac0/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=QbnMaks1c-bPXRhe7oHTfnKKO_6PdN48H5AvoV1qdYU"
 
@@ -210,11 +210,11 @@ if points_list:
             buffer = io.BytesIO()
             right_display.save(buffer, format="JPEG", quality=85)
             
-            # 🛑 FIX: We remove the "data:image/jpeg;base64," prefix so Excel Office JS accepts the image format directly
+            # Stripped prefix logic so Office JS accepts the stream format seamlessly
             base64_string = base64.b64encode(buffer.getvalue()).decode('utf-8')
             
-            # Assign landing coordinates on your spreadsheet dashboard depending on the active plant matrix
-            grid_positions = {'Cambridge___07': "A2", 'Oshawa___04': "I2", 'Windsor___02': "Q2"}
+            # Layout offset adjustment preventing horizontal overlapping inside Excel workbook grid 
+            grid_positions = {'Cambridge___07': "A2", 'Oshawa___04': "M2", 'Windsor___02': "Y2"}
             target_cell = grid_positions.get(plant_key, "A2")
             
             # 2. Sequential transmission loop with rate-limiting fix
@@ -240,7 +240,7 @@ if points_list:
                 # Send data packet to Power Automate
                 requests.post(POWER_AUTOMATE_URL, json=payload)
                 
-                # RATE LIMITING FIX: Pause for 1.5 seconds between requests to avoid HTTP 429 errors from SharePoint
+                # 🛑 Pause for 1.5 seconds between requests to avoid HTTP 429 errors from SharePoint
                 time.sleep(1.5)
             
             st.success("🎉 Master Excel rows logged! Multi-point canvas dashboard refreshed live on SharePoint!")
