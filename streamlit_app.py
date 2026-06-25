@@ -19,6 +19,8 @@ st.info("💡 Drop points to log leaks. Clicking 'Synchronize' will push the dat
 
 # 1. Plant Selection
 plant = st.selectbox("Select Plant:", ['Cambridge - 07', 'Oshawa - 04', 'Windsor - 02'])
+
+# Create a clean key for session state dictionaries
 plant_key = plant.replace(' ', '_').replace('-', '_')
 
 # Persistent storage setup for historical context tracking across the runtime session
@@ -47,12 +49,17 @@ def get_real_weather_data(plant_name, target_date):
     except:
         return "0.0 mm"
 
-# Load base image layouts safely
+# Load base image layouts safely using your precise file-naming patterns
 try:
-    # Handle filename cleanups
-    clean_key = plant_key.replace("___", "").replace("_", "")
-    left_path = f"data/{clean_key}CAD.png"
-    right_path = f"data/{clean_key}.png"
+    if plant == "Cambridge - 07":
+        left_path = "data/CambridgeCAD.png"
+        right_path = "data/Cambridge.png"
+    elif plant == "Oshawa - 04":
+        left_path = "data/OshawaCAD.png"
+        right_path = "data/Oshawa.png"
+    else:
+        left_path = "data/WindsorCAD.png"
+        right_path = "data/Windsor.png"
 
     left_img = Image.open(left_path).convert("RGB")
     right_img = Image.open(right_path).convert("RGB")
@@ -156,3 +163,4 @@ if active_points:
                     requests.post(POWER_AUTOMATE_URL, json=payload)
                 
                 st.success("🎉 Master Excel rows logged! Multi-point canvas dashboard refreshed live on SharePoint!")
+                
