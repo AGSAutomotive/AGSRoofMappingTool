@@ -122,4 +122,118 @@ with c1:
     click = streamlit_image_coordinates(left_display, key=f"click_{plant_key}")
     if click and click != st.session_state.get(f"lclick_{plant_key}"):
         st.session_state[f"lclick_{plant_key}"] = click
-        serial = len(st.session_state
+        serial = len(st.session_state["master_history_database"][plant_key]) + 1
+        
+        new_point = {
+            'id': str(time.time()).replace(".", ""),
+            'serial': serial, 
+            'x': click['x'], 
+            'y': click['y'],
+            'name': f"Leak Point {serial}", 
+            'start_date': datetime.date.today()
+        }
+        st.session_state["master_history_database"][plant_key].append(new_point)
+        st.rerun()
+with c2:
+    st.subheader("🦅 Combined Historical Roof View")
+    st.image(right_display)
+
+# --- 📋 SAVED RECORDS GRID DASHBOARD ---
+st.write("---")
+st.subheader("📋 Saved Leak Records Dashboard")
+
+points_list = st.session_state["master_history_database"].get(plant_key, [])
+
+if not points_list:
+    st.info(f"💡 No leaks mapped yet for {plant}. Click on the left Floor Map image to begin pinning locations.")
+else:
+    st.info("💡 **Click to rename:** Click directly inside any text box below to customize labels and select dates.")
+    
+    grid_header1, grid_header2, grid_header3, grid_header4, grid_header5, grid_header6 = st.columns([1.0, 2.2, 1.8, 2.3, 2.3, 1.4])
+    with grid_header3:
+        st.markdown("**📅 Date Noticed**")
+    with grid_header4:
+        st.markdown("**🌦️ Precipitation (Day Noticed)**")
+    with grid_header5:
+        st.markdown("**🌦️ Precipitation (Day Before)**")
+
+    for index, point in enumerate(points_list):
+        edit_col1, edit_col2, edit_col3, edit_col4, edit_col5, edit_col6 = st.columns([1.0, 2.2, 1.8, 2.3, 2.3, 1.4])
+        
+        with edit_col1:
+            st.write(f"**#{point['serial']}**")
+            
+        with edit_col2:
+            new_name = st.text_input(
+                "Rename label:", 
+                value=point['name'], 
+                key=f"rename_{plant_key}_{point['id']}",
+                label_visibility="collapsed"
+            )
+            if new_name != point['name']:
+                st.session_state["master_history_database"][plant_key][index]['name'] = new_name
+                st.rerun()
+                
+        with edit_col3:
+            chosen_date = st.date_input(
+                "Date Leak Noticed",
+                value=point.get('start_date', datetime.date.today()),
+                max_value=datetime.date.today(),
+                key=f"date_{plant_key}_{point['id']}",
+                label_visibility="collapsed"
+            )
+            if chosen_date != point.get('start_date'):
+                st.session_state["master_history_database"][plant_key][index]['start_date'] = chosen_date
+                st.rerun()
+        
+        day_before_date = chosen_date - datetime.timedelta(days=1)
+        
+        with edit_col4:
+            p_noticed = get_real_weather_data(plant, chosen_date)
+            st.markdown(f"**{p_noticed}**")
+            
+        with edit_col5:
+            p_before = get_real_weather_data(plant, day_before_date)
+            st.markdown(f"**{p_before}**")
+                
+        with edit_col6:
+            if st.button("🗑️ Delete", key=f"del_{plant_key}_{point['id']}", use_container_width=True):
+                st.session_state["master_history_database"][plant_key].pop(index)
+                st.rerun()
+
+# --- 🚀 SUBMIT ENGINE TRANSMISSION BLOCK ---
+if points_list:
+    st.write("---")
+    if st.button("🚀 Synchronize Master System Logs & Update SharePoint Images", type="primary", use_container_width=True):
+        with st.spinner("Processing composite canvas layouts and updating cloud datasets..."):
+            # 1. Compress and encode the entire marked roof overview image containing ALL dots into Base64
+            buffer = io.BytesIO()
+            right_display.save(buffer, format="JPEG", quality=85)
+            base64_string = "data:image/jpeg;base64," + base64.b64encode(buffer.getvalue()).decode('utf-8')
+            
+            # Assign landing coordinates on your spreadsheet dashboard depending on the active plant matrix
+            grid_positions = {'Cambridge___07': "A2", 'Oshawa___04': "I2", 'Windsor___02': "Q2"}
+            target_cell = grid_positions.get(plant_key, "A2")
+            
+            # 2. Sequential transmission loop
+            for pt in points_list:
+                chosen_date = pt.get('start_date', datetime.date.today())
+                p_not = get_real_weather_data(plant, chosen_date)
+                p_bef = get_real_weather_data(plant, chosen_date - datetime.timedelta(days=1))
+                
+                payload = {
+                    "Plant": plant,
+                    "Serial": int(pt['serial']),
+                    "Label": pt['name'],
+                    "DateNoticed": chosen_date.strftime("%Y-%m-%d"),
+                    "PrecipNoticed": p_not,
+                    "PrecipBefore": p_bef,
+                    "CoordinateX": int(pt['x']),
+                    "CoordinateY": int(pt['y']),
+                    "Timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    "Base64MapData": base64_string,
+                    "DashboardCell": target_cell
+                }
+                requests.post(POWER_AUTOMATE_URL, json=payload)
+            
+            st.success("🎉 Master Excel rows logged! Multi-point canvas dashboard refreshed live on SharePoint!")
