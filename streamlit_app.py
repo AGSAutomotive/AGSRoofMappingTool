@@ -130,7 +130,7 @@ st.write("---")
 st.subheader("📋 New Unreported Leaks")
 
 if not st.session_state["new_pins_batch"]:
-    st.info("💡No new leaks plotted yet. Click on the left image to plot new leaks.")
+    st.info("💡No new leaks plotted yet for {plant}. Click on the left image to plot new leaks.")
 else:
     # 🎯 RESTORED COLUMN HEADERS GRID
     grid_header1, grid_header2, grid_header3, grid_header4, grid_header5, grid_header6 = st.columns([1.0, 2.2, 1.8, 2.3, 2.3, 1.4])
