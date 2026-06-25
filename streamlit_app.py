@@ -17,7 +17,7 @@ st.set_page_config(page_title="AGS Roof Leak Master Mapper", layout="wide")
 st.title("🏭 AGS Roof Leak Master Tracking System")
 
 # 🎯 RESTORED INFO BLOCK: Guidelines for users dropping pins
-st.info("💡 Drop points to log leaks. Clicking 'Synchronize' will push the data rows AND send a consolidated master overview map showing every dot to your SharePoint dashboard sheet.")
+st.info("💡Select plant, then click on the left "Floor View" image to log leak locations. Use the dashboard below to rename labels, select dates, and report the leaks.")
 
 # 1. Plant Selection
 plant = st.selectbox("Select Plant:", ['Cambridge - 07', 'Oshawa - 04', 'Windsor - 02'])
