@@ -157,47 +157,62 @@ else:
 if st.session_state["new_pins_batch"]:
     st.write("---")
     st.info("💡Once all new leaks are plotted, click 'Report Leaks' button below to save.")
-    if st.button("🚀 Report Leaks", type="primary", use_container_width=True):
-        with st.spinner("Uploading and updating consolidated overview maps..."):
-            # Compress and encode the transparent overlay matrix into Png format (to preserve alpha layers)
-            buffer = io.BytesIO()
-            excel_overlay_canvas.save(buffer, format="PNG")
-            base64_string = base64.b64encode(buffer.getvalue()).decode('utf-8')
-            
-            grid_positions = {'Cambridge___07': "A2", 'Oshawa___04': "M2", 'Windsor___02': "Y2"}
-            target_cell = grid_positions.get(plant_key, "A2")
-            
-            # Send text rows sequentially
-            for pt in st.session_state["new_pins_batch"][:-1]:
-                c_date = pt['start_date']
-                payload = {
-                    "Plant": plant, "Serial": int(pt['serial']), "Label": pt['name'],
+    
+    # Custom CSS injection to targeting button font rendering scales directly
+    st.markdown("""
+        <style>
+            div[data-testid="stButton"] button p {
+                font-size: 24px !important;
+                font-weight: bold !important;
+            }
+        </style>
+    """, unsafe_allow_html=True)
+    
+    # Setup layout column alignment framework to truncate extreme horizontal width expansion
+    btn_layout_col, spacer_col = st.columns([2.5, 7.5])
+    
+    with btn_layout_col:
+        if st.button("🚀 Report Leaks", type="primary", use_container_width=True):
+            with st.spinner("Uploading and updating consolidated overview maps..."):
+                # Compress and encode the transparent overlay matrix into Png format (to preserve alpha layers)
+                buffer = io.BytesIO()
+                excel_overlay_canvas.save(buffer, format="PNG")
+                base64_string = base64.b64encode(buffer.getvalue()).decode('utf-8')
+                
+                grid_positions = {'Cambridge___07': "A2", 'Oshawa___04': "M2", 'Windsor___02': "Y2"}
+                target_cell = grid_positions.get(plant_key, "A2")
+                
+                # Send text rows sequentially
+                for pt in st.session_state["new_pins_batch"][:-1]:
+                    c_date = pt['start_date']
+                    payload = {
+                        "Plant": plant, "Serial": int(pt['serial']), "Label": pt['name'],
+                        "DateNoticed": c_date.strftime("%Y-%m-%d"),
+                        "PrecipNoticed": get_real_weather_data(plant, c_date),
+                        "PrecipBefore": get_real_weather_data(plant, c_date - datetime.timedelta(days=1)),
+                        "CoordinateX": int(pt['x']), "CoordinateY": int(pt['y']),
+                        "Timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                        "Base64MapData": "", "DashboardCell": target_cell
+                    }
+                    requests.post(POWER_AUTOMATE_URL, json=payload)
+                    time.sleep(1.5)
+                
+                # Send final payload containing the fresh dots overlay string
+                last_pt = st.session_state["new_pins_batch"][-1]
+                c_date = last_pt['start_date']
+                final_payload = {
+                    "Plant": plant, "Serial": int(last_pt['serial']), "Label": last_pt['name'],
                     "DateNoticed": c_date.strftime("%Y-%m-%d"),
                     "PrecipNoticed": get_real_weather_data(plant, c_date),
                     "PrecipBefore": get_real_weather_data(plant, c_date - datetime.timedelta(days=1)),
-                    "CoordinateX": int(pt['x']), "CoordinateY": int(pt['y']),
+                    "CoordinateX": int(last_pt['x']), "CoordinateY": int(last_pt['y']),
                     "Timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                    "Base64MapData": "", "DashboardCell": target_cell
+                    "Base64MapData": base64_string, "DashboardCell": target_cell
                 }
-                requests.post(POWER_AUTOMATE_URL, json=payload)
-                time.sleep(1.5)
-            
-            # Send final payload containing the fresh dots overlay string
-            last_pt = st.session_state["new_pins_batch"][-1]
-            c_date = last_pt['start_date']
-            final_payload = {
-                "Plant": plant, "Serial": int(last_pt['serial']), "Label": last_pt['name'],
-                "DateNoticed": c_date.strftime("%Y-%m-%d"),
-                "PrecipNoticed": get_real_weather_data(plant, c_date),
-                "PrecipBefore": get_real_weather_data(plant, c_date - datetime.timedelta(days=1)),
-                "CoordinateX": int(last_pt['x']), "CoordinateY": int(last_pt['y']),
-                "Timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                "Base64MapData": base64_string, "DashboardCell": target_cell
-            }
-            requests.post(POWER_AUTOMATE_URL, json=final_payload)
-            
-            # Wipe local queue so the app returns to a fresh blank slate for the next run
-            st.session_state["new_pins_batch"] = []
-            st.success("🎉 Leaks reported successfully!")
-            time.sleep(1)
-            st.rerun()
+                requests.post(POWER_AUTOMATE_URL, json=final_payload)
+                
+                # Wipe local queue so the app returns to a fresh blank slate for the next run
+                st.session_state["new_pins_batch"] = []
+                st.success("🎉 Leaks reported successfully!")
+                time.sleep(1)
+                st.rerun()
