@@ -12,7 +12,7 @@ from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 # ------------------------------------------------------------------
 # CONFIGURATION: Paste your unique Power Automate HTTP URL link here
 # ------------------------------------------------------------------
-POWER_AUTOMATE_URL = "YOUR_POWER_AUTOMATE_HTTP_URL_HERE"
+POWER_AUTOMATE_URL = "https://default9b2f9cbe865b4df8a5848494d8c1ef.f6.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/47ed5cfbda7d44a3a9ca56f439adaac0/triggers/manual/paths/invoke?api-version=1"
 
 # Set up page layout
 st.set_page_config(page_title="AGS Roof Leak Mapper", layout="wide")
