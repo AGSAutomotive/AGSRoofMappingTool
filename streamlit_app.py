@@ -166,7 +166,7 @@ else:
 # --- 🚀 SUBMIT ENGINE TRANSMISSION BLOCK ---
 if st.session_state["new_pins_batch"]:
     st.write("---")
-    st.info("💡Once all new leaks are plotted, click 'Report Leaks' button below to save.")
+    st.info("💡Once all new leaks are plotted, click **'Report Leaks'** button below to save.")
     
     # Custom CSS injection strictly targeting the primary submit button's text properties
     st.markdown("""
