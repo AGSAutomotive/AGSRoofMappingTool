@@ -130,7 +130,7 @@ st.write("---")
 st.subheader("📋 New Unreported Leaks")
 
 if not st.session_state["new_pins_batch"]:
-    st.info("💡 No new leaks plotted yet. Click on the left image to plot new leaks.")
+    st.info("💡No new leaks plotted yet. Click on the left image to plot new leaks.")
 else:
     for index, point in enumerate(st.session_state["new_pins_batch"]):
         c_idx, c_lbl, c_dt, c_w1, c_w2, c_del = st.columns([1.0, 2.2, 1.8, 2.3, 2.3, 1.4])
@@ -156,7 +156,7 @@ else:
 # --- 🚀 SUBMIT ENGINE TRANSMISSION BLOCK ---
 if st.session_state["new_pins_batch"]:
     st.write("---")
-    st.info("Once all new leaks are plotted, click 'Report Leaks' button below to save.")
+    st.info("💡Once all new leaks are plotted, click 'Report Leaks' button below to save.")
     if st.button("🚀 Report Leaks", type="primary", use_container_width=True):
         with st.spinner("Uploading and updating consolidated overview maps..."):
             # Compress and encode the transparent overlay matrix into Png format (to preserve alpha layers)
