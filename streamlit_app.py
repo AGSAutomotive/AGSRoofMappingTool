@@ -132,6 +132,15 @@ st.subheader("📋 New Unreported Leaks")
 if not st.session_state["new_pins_batch"]:
     st.info("💡No new leaks plotted yet. Click on the left image to plot new leaks.")
 else:
+    # 🎯 RESTORED COLUMN HEADERS GRID
+    grid_header1, grid_header2, grid_header3, grid_header4, grid_header5, grid_header6 = st.columns([1.0, 2.2, 1.8, 2.3, 2.3, 1.4])
+    with grid_header3:
+        st.markdown("**📅 Date Noticed**")
+    with grid_header4:
+        st.markdown("**🌦️ Precipitation (Day Noticed)**")
+    with grid_header5:
+        st.markdown("**🌦️ Precipitation (Day Before)**")
+
     for index, point in enumerate(st.session_state["new_pins_batch"]):
         c_idx, c_lbl, c_dt, c_w1, c_w2, c_del = st.columns([1.0, 2.2, 1.8, 2.3, 2.3, 1.4])
         with c_idx: st.write(f"**#{point['serial']}**")
@@ -158,10 +167,10 @@ if st.session_state["new_pins_batch"]:
     st.write("---")
     st.info("💡Once all new leaks are plotted, click 'Report Leaks' button below to save.")
     
-    # Custom CSS injection to targeting button font rendering scales directly
+    # Custom CSS injection strictly targeting the primary submit button's text properties
     st.markdown("""
         <style>
-            div[data-testid="stButton"] button p {
+            div[data-testid="stButton"] button[kind="primary"] p {
                 font-size: 24px !important;
                 font-weight: bold !important;
             }
