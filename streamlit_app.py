@@ -14,7 +14,7 @@ POWER_AUTOMATE_URL = "https://default9b2f9cbe865b4df8a5848494d8c1ef.f6.environme
 
 # Set up page layout
 st.set_page_config(page_title="AGS Roof Leak Master Mapper", layout="wide")
-st.title("🏭 AGS Roof Leak Master Tracking System")
+st.title("🏭 AGS Roof Leak Tracking Tool")
 
 # 🎯 RESTORED INFO BLOCK: Guidelines for users dropping pins
 st.info("💡Select plant, then click on the left Floor Map to plot leak locations. Use the dashboard below to rename labels, select dates, and report the leaks.")
