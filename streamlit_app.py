@@ -206,10 +206,12 @@ if points_list:
     st.write("---")
     if st.button("🚀 Synchronize Master System Logs & Update SharePoint Images", type="primary", use_container_width=True):
         with st.spinner("Processing composite canvas layouts and updating cloud datasets..."):
-            # 1. Compress and encode the entire marked roof overview image containing ALL dots into Base64
+            # 1. Compress and encode the entire marked roof overview image containing ALL dots into PURE Base64
             buffer = io.BytesIO()
             right_display.save(buffer, format="JPEG", quality=85)
-            base64_string = "data:image/jpeg;base64," + base64.b64encode(buffer.getvalue()).decode('utf-8')
+            
+            # 🛑 FIX: We remove the "data:image/jpeg;base64," prefix so Excel Office JS accepts the image format directly
+            base64_string = base64.b64encode(buffer.getvalue()).decode('utf-8')
             
             # Assign landing coordinates on your spreadsheet dashboard depending on the active plant matrix
             grid_positions = {'Cambridge___07': "A2", 'Oshawa___04': "I2", 'Windsor___02': "Q2"}
@@ -238,7 +240,7 @@ if points_list:
                 # Send data packet to Power Automate
                 requests.post(POWER_AUTOMATE_URL, json=payload)
                 
-                # 🛑 RATE LIMITING FIX: Pause for 1.5 seconds between requests to avoid HTTP 429 errors from SharePoint
+                # RATE LIMITING FIX: Pause for 1.5 seconds between requests to avoid HTTP 429 errors from SharePoint
                 time.sleep(1.5)
             
             st.success("🎉 Master Excel rows logged! Multi-point canvas dashboard refreshed live on SharePoint!")
