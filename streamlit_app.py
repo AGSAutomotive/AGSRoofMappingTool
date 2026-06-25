@@ -16,6 +16,9 @@ POWER_AUTOMATE_URL = "https://default9b2f9cbe865b4df8a5848494d8c1ef.f6.environme
 st.set_page_config(page_title="AGS Roof Leak Master Mapper", layout="wide")
 st.title("🏭 AGS Roof Leak Master Tracking System")
 
+# 🎯 RESTORED INFO BLOCK: Guidelines for users dropping pins
+st.info("💡 Drop points to log leaks. Clicking 'Synchronize' will push the data rows AND send a consolidated master overview map showing every dot to your SharePoint dashboard sheet.")
+
 # 1. Plant Selection
 plant = st.selectbox("Select Plant:", ['Cambridge - 07', 'Oshawa - 04', 'Windsor - 02'])
 plant_key = plant.replace(' ', '_').replace('-', '_')
@@ -73,8 +76,7 @@ right_display = right_resized.copy()
 draw_left = ImageDraw.Draw(left_display)
 draw_right = ImageDraw.Draw(right_display)
 
-# 🧠 CRITICAL CHANGE: Create a completely BLANK, TRANSPARENT overlay canvas for Excel
-# This allows pins to stack incrementally in Excel without hiding previous sync actions
+# Create a completely BLANK, TRANSPARENT overlay canvas for Excel stacking logic
 excel_overlay_canvas = Image.new("RGBA", right_resized.size, (255, 255, 255, 0))
 draw_excel = ImageDraw.Draw(excel_overlay_canvas)
 
