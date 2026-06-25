@@ -215,7 +215,7 @@ if points_list:
             grid_positions = {'Cambridge___07': "A2", 'Oshawa___04': "I2", 'Windsor___02': "Q2"}
             target_cell = grid_positions.get(plant_key, "A2")
             
-            # 2. Sequential transmission loop
+            # 2. Sequential transmission loop with rate-limiting fix
             for pt in points_list:
                 chosen_date = pt.get('start_date', datetime.date.today())
                 p_not = get_real_weather_data(plant, chosen_date)
@@ -234,6 +234,11 @@ if points_list:
                     "Base64MapData": base64_string,
                     "DashboardCell": target_cell
                 }
+                
+                # Send data packet to Power Automate
                 requests.post(POWER_AUTOMATE_URL, json=payload)
+                
+                # 🛑 RATE LIMITING FIX: Pause for 1.5 seconds between requests to avoid HTTP 429 errors from SharePoint
+                time.sleep(1.5)
             
             st.success("🎉 Master Excel rows logged! Multi-point canvas dashboard refreshed live on SharePoint!")
