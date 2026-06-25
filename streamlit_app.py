@@ -17,7 +17,7 @@ st.set_page_config(page_title="AGS Roof Leak Master Mapper", layout="wide")
 st.title("🏭 AGS Roof Leak Master Tracking System")
 
 # 🎯 RESTORED INFO BLOCK: Guidelines for users dropping pins
-st.info("💡Select plant, then click on the left 'Floor View' image to log leak locations. Use the dashboard below to rename labels, select dates, and report the leaks.")
+st.info("💡Select plant, then click on the left Floor Map to plot leak locations. Use the dashboard below to rename labels, select dates, and report the leaks.")
 
 # 1. Plant Selection
 plant = st.selectbox("Select Plant:", ['Cambridge - 07', 'Oshawa - 04', 'Windsor - 02'])
@@ -109,7 +109,7 @@ for pt in st.session_state["new_pins_batch"]:
 st.write("---")
 col1, col2 = st.columns(2)
 with col1:
-    st.subheader("🗺️ Floor Map View")
+    st.subheader("🗺️ Floor Map")
     click = streamlit_image_coordinates(left_display, key=f"click_{plant_key}")
     if click and click != st.session_state.get(f"lclick_{plant_key}"):
         st.session_state[f"lclick_{plant_key}"] = click
@@ -122,15 +122,15 @@ with col1:
         })
         st.rerun()
 with col2:
-    st.subheader("🦅 Current Staged Session View")
+    st.subheader("🦅 Roof View")
     st.image(right_display)
 
 # --- Grid Form Layout Area ---
 st.write("---")
-st.subheader("📋 New Unsynced Leak Records Queue")
+st.subheader("📋 New Unreported Leaks")
 
 if not st.session_state["new_pins_batch"]:
-    st.info("💡 No new pins staged in current session. Click on the left image to plot new leak coordinates.")
+    st.info("💡 No new leaks plotted yet. Click on the left image to plot new leaks.")
 else:
     for index, point in enumerate(st.session_state["new_pins_batch"]):
         c_idx, c_lbl, c_dt, c_w1, c_w2, c_del = st.columns([1.0, 2.2, 1.8, 2.3, 2.3, 1.4])
@@ -156,7 +156,8 @@ else:
 # --- 🚀 SUBMIT ENGINE TRANSMISSION BLOCK ---
 if st.session_state["new_pins_batch"]:
     st.write("---")
-    if st.button("🚀 Synchronize Master System Logs & Update SharePoint Images", type="primary", use_container_width=True):
+    st.info("Once all new leaks are plotted, click 'Report Leaks" below to save.")
+    if st.button("🚀 Report Leaks", type="primary", use_container_width=True):
         with st.spinner("Uploading and updating consolidated overview maps..."):
             # Compress and encode the transparent overlay matrix into Png format (to preserve alpha layers)
             buffer = io.BytesIO()
@@ -197,6 +198,6 @@ if st.session_state["new_pins_batch"]:
             
             # Wipe local queue so the app returns to a fresh blank slate for the next run
             st.session_state["new_pins_batch"] = []
-            st.success("🎉 Sync complete! Transparent pin layer deployed directly to Excel dashboard matrix.")
+            st.success("🎉 Leaks reported successfully!")
             time.sleep(1)
             st.rerun()
