@@ -42,9 +42,17 @@ EXCEL_FETCH_URL = "https://default9b2f9cbe865b4df8a5848494d8c1ef.f6.environment.
 st.set_page_config(page_title="AGS Roof Leak Master Mapper", layout="wide")
 st.title("🏭 AGS Roof Leak Tracking Tool")
 
-# 1. Plant Selection
-plant = st.selectbox("Select Plant:", ['Cambridge - 07', 'Oshawa - 04', 'Windsor - 02'])
-plant_key = plant.replace(' ', '_').replace('-', '_')
+# 1. User & Plant Info Inputs
+col_p1, col_p2 = st.columns([4.0, 6.0])
+with col_p1:
+    plant = st.selectbox("Select Plant:", ['Cambridge - 07', 'Oshawa - 04', 'Windsor - 02'])
+    plant_key = plant.replace(' ', '_').replace('-', '_')
+with col_p2:
+    # Required User Email Field
+    user_email = st.text_input("📋 Enter your AGS Automotive Email:", placeholder="username@agsautomotive.com").strip().lower()
+
+# Validate the email before letting them proceed
+is_email_valid = user_email.endswith("@agsautomotive.com") and len(user_email) > 18
 
 # Clean local session tracking state (wipes when page reloads)
 if "new_pins_batch" not in st.session_state or st.session_state.get("current_active_plant") != plant:
@@ -219,7 +227,12 @@ else:
 # --- 🚀 SUBMIT ENGINE TRANSMISSION BLOCK ---
 if st.session_state["new_pins_batch"]:
     st.write("---")
-    st.info("💡Once all new leaks are plotted, click **'Report Leaks'** button below to save.")
+    
+    # Check block to ensure they cannot click report until email is typed out
+    if not is_email_valid:
+        st.error("🛑 **Submission Locked:** You must enter a valid AGS Automotive email address above (`@agsautomotive.com`) before you can submit this leak report.")
+    else:
+        st.info("💡Once all new leaks are plotted, click **'Report Leaks'** button below to save.")
     
     st.markdown("""
         <style>
@@ -233,7 +246,8 @@ if st.session_state["new_pins_batch"]:
     btn_layout_col, spacer_col = st.columns([2.5, 7.5])
     
     with btn_layout_col:
-        if st.button("🚀 Report Leaks", type="primary", use_container_width=True):
+        # The button disables automatically if email validation fails
+        if st.button("🚀 Report Leaks", type="primary", use_container_width=True, disabled=not is_email_valid):
             with st.spinner("Uploading and updating consolidated overview maps..."):
                 buffer = io.BytesIO()
                 excel_overlay_canvas.save(buffer, format="PNG")
@@ -251,7 +265,8 @@ if st.session_state["new_pins_batch"]:
                         "PrecipBefore": get_real_weather_data(plant, c_date - datetime.timedelta(days=1)),
                         "CoordinateX": int(pt['x']), "CoordinateY": int(pt['y']),
                         "Timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                        "Base64MapData": "", "DashboardCell": target_cell
+                        "Base64MapData": "", "DashboardCell": target_cell,
+                        "ReporterEmail": user_email  # Linked user tracking tag
                     }
                     requests.post(POWER_AUTOMATE_URL, json=payload)
                     time.sleep(1.5)
@@ -265,7 +280,8 @@ if st.session_state["new_pins_batch"]:
                     "PrecipBefore": get_real_weather_data(plant, c_date - datetime.timedelta(days=1)),
                     "CoordinateX": int(last_pt['x']), "CoordinateY": int(last_pt['y']),
                     "Timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                    "Base64MapData": base64_string, "DashboardCell": target_cell
+                    "Base64MapData": base64_string, "DashboardCell": target_cell,
+                    "ReporterEmail": user_email  # Linked user tracking tag
                 }
                 requests.post(POWER_AUTOMATE_URL, json=final_payload)
                 
@@ -284,7 +300,6 @@ with st.expander("🔒 Administrator History View (Live Database Sync)", expande
     historical_records = []
     
     try:
-        # Cache breaker applied to ensure immediate updates when rows are altered in Excel
         response = requests.get(f"{EXCEL_FETCH_URL}&cb={time.time()}", timeout=8)
         if response.status_code == 200:
             historical_records = response.json()
@@ -293,16 +308,13 @@ with st.expander("🔒 Administrator History View (Live Database Sync)", expande
     except Exception as e:
         st.error("⚠️ Failed to communicate with live Power Automate database retriever flow.")
 
-    # Normalize structure and clean Excel serial numbers into standard YYYY/MM/DD strings
     plant_historical_records = []
     for r in historical_records:
         if str(r.get("Plant", "")).strip() == plant:
             raw_date = r.get("DateNoticed", "")
             try:
-                # If Excel served a serial timestamp sequence (e.g., 46182)
                 if str(raw_date).isdigit() or isinstance(raw_date, (int, float)):
                     serial_num = int(float(raw_date))
-                    # Adjusting anchor to sync with Excel's leap-year bug calculation offset
                     converted_dt = datetime.date(1899, 12, 30) + datetime.timedelta(days=serial_num)
                     r["DateNoticed"] = converted_dt.strftime("%Y/%m/%d")
             except Exception:
@@ -323,7 +335,6 @@ with st.expander("🔒 Administrator History View (Live Database Sync)", expande
                 hy = int(float(record["CoordinateY"]))
                 h_label = str(record.get("Label", "Unlabeled Point"))
                 
-                # Plot historical assets using distinct yellow/orange styling
                 draw_history.ellipse((hx-10, hy-10, hx+10, hy+10), outline="yellow", width=2)
                 draw_history.ellipse((hx-3, hy-3, hx+3, hy+3), fill="orange")
                 
