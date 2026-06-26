@@ -4,6 +4,7 @@ from PIL import Image, ImageDraw
 import time
 import io
 import datetime
+from zoneinfo import ZoneInfo  # For accurate Eastern Time Zone tracking
 import requests
 import base64
 import threading
@@ -32,13 +33,9 @@ if "keep_awake_thread_started" not in st.session_state:
 # ------------------------------------------------------------------
 # 🔗 CONFIGURATION: Power Automate Endpoints
 # ------------------------------------------------------------------
-# Flow 1: For submitting new leaks
 POWER_AUTOMATE_URL = "https://default9b2f9cbe865b4df8a5848494d8c1ef.f6.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/47ed5cfbda7d44a3a9ca56f439adaac0/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=QbnMaks1c-bPXRhe7oHTfnKKO_6PdN48H5AvoV1qdYU"
-
-# Flow 2: For retrieving history
 EXCEL_FETCH_URL = "https://default9b2f9cbe865b4df8a5848494d8c1ef.f6.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/1cada14a49c94756afd2dfa3079ce584/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=eRGiFPth2frXt9B3k9PNGkmSFyf45-bq7fAw-6AniZc" 
 
-# Set up page layout
 st.set_page_config(page_title="AGS Roof Leak Master Mapper", layout="wide")
 st.title("🏭 AGS Roof Leak Tracking Tool")
 
@@ -48,13 +45,10 @@ with col_p1:
     plant = st.selectbox("Select Plant:", ['Cambridge - 07', 'Oshawa - 04', 'Windsor - 02'])
     plant_key = plant.replace(' ', '_').replace('-', '_')
 with col_p2:
-    # Required User Email Field
     user_email = st.text_input("📋 Enter your AGS Automotive Email:", placeholder="username@agsautomotive.com").strip().lower()
 
-# Validate the email before letting them proceed
 is_email_valid = user_email.endswith("@agsautomotive.com") and len(user_email) > 18
 
-# Clean local session tracking state (wipes when page reloads)
 if "new_pins_batch" not in st.session_state or st.session_state.get("current_active_plant") != plant:
     st.session_state["current_active_plant"] = plant
     st.session_state["new_pins_batch"] = []
@@ -101,13 +95,12 @@ except Exception as e:
     st.error(f"⚠️ Base asset missing inside data/ directory: {e}")
     st.stop()
 
-# Build app display canvases
 left_display = left_resized.copy()
 right_display = right_resized.copy()
 draw_left = ImageDraw.Draw(left_display)
 draw_right = ImageDraw.Draw(right_display)
 
-# Create a completely BLANK, TRANSPARENT overlay canvas for Excel stacking logic
+# Create Transparent overlay layer 
 excel_overlay_canvas = Image.new("RGBA", right_resized.size, (255, 255, 255, 0))
 draw_excel = ImageDraw.Draw(excel_overlay_canvas)
 
@@ -130,7 +123,7 @@ for pt in st.session_state["new_pins_batch"]:
     draw_right.rectangle((bbox_right[0]-4, bbox_right[1]-2, bbox_right[2]+4, bbox_right[3]+2), fill="#1A1A1A", outline="cyan", width=1)
     draw_right.text(text_pos_right, custom_name, fill="cyan")
 
-    # Draw onto the transparent Excel layout layer (Isolated session visual capture)
+    # Draw onto transparent overlay layer
     draw_excel.ellipse((x-12, y-12, x+12, y+12), outline="cyan", width=3)
     draw_excel.ellipse((x-3, y-3, x+3, y+3), fill="red")
     draw_excel.rectangle((bbox_right[0]-4, bbox_right[1]-2, bbox_right[2]+4, bbox_right[3]+2), fill="#1A1A1A", outline="cyan", width=1)
@@ -165,12 +158,9 @@ if not st.session_state["new_pins_batch"]:
 else:
     st.info("💡**Click to rename:** Click directly inside any text box below to customize the leak label or date.")
     grid_header1, grid_header2, grid_header3, grid_header4, grid_header5, grid_header6 = st.columns([1.0, 2.2, 1.8, 2.3, 2.3, 1.4])
-    with grid_header3:
-        st.markdown("**📅 Date Noticed**")
-    with grid_header4:
-        st.markdown("**🌦️ Precipitation (Day Noticed)**")
-    with grid_header5:
-        st.markdown("**🌦️ Precipitation (Day Before)**")
+    with grid_header3: st.markdown("**📅 Date Noticed**")
+    with grid_header4: st.markdown("**🌦️ Precipitation (Day Noticed)**")
+    with grid_header5: st.markdown("**🌦️ Precipitation (Day Before)**")
 
     for index, point in enumerate(st.session_state["new_pins_batch"]):
         c_idx, c_lbl, c_dt, c_w1, c_w2, c_del = st.columns([1.0, 2.2, 1.8, 2.3, 2.3, 1.4])
@@ -193,11 +183,10 @@ else:
                 st.session_state["new_pins_batch"].pop(index)
                 st.rerun()
 
-# --- 🚀 SUBMIT ENGINE TRANSMISSION BLOCK ---
+# --- 🚀 BATCHED SUBMIT ENGINE TRANSMISSION BLOCK ---
 if st.session_state["new_pins_batch"]:
     st.write("---")
     
-    # Check block to ensure they cannot click report until email is typed out
     if not is_email_valid:
         st.error("🛑 **Submission Locked:** You must enter a valid AGS Automotive email address above (`@agsautomotive.com`) before you can submit this leak report.")
     else:
@@ -216,45 +205,52 @@ if st.session_state["new_pins_batch"]:
     
     with btn_layout_col:
         if st.button("🚀 Report Leaks", type="primary", use_container_width=True, disabled=not is_email_valid):
-            with st.spinner("Uploading and updating consolidated overview maps..."):
+            with st.spinner("Generating consolidated maps and compiling summary table..."):
+                
+                # 🛠️ FIX 2: Generate the complete image by sandwiching the overlay onto the original satellite image background
+                final_merged_image = right_resized.convert("RGBA")
+                final_merged_image.paste(excel_overlay_canvas, (0, 0), excel_overlay_canvas)
+                final_merged_image = final_merged_image.convert("RGB") # Flatten to standard viewable image format
+                
                 buffer = io.BytesIO()
-                excel_overlay_canvas.save(buffer, format="PNG")
+                final_merged_image.save(buffer, format="JPEG", quality=90)
                 base64_string = base64.b64encode(buffer.getvalue()).decode('utf-8')
+                
+                # 🛠️ FIX 1: Explicitly force time tracking to local Eastern Time Zone (3:30 PM)
+                local_timestamp = datetime.datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d %H:%M:%S")
                 
                 grid_positions = {'Cambridge___07': "A2", 'Oshawa___04': "M2", 'Windsor___02': "Y2"}
                 target_cell = grid_positions.get(plant_key, "A2")
                 
-                for pt in st.session_state["new_pins_batch"][:-1]:
+                # 🛠️ FIX 3: Package ALL itemized points together into a structured dynamic data array
+                leak_items_list = []
+                for pt in st.session_state["new_pins_batch"]:
                     c_date = pt['start_date']
-                    payload = {
-                        "Plant": plant, "Serial": int(pt['serial']), "Label": pt['name'],
+                    leak_items_list.append({
+                        "Serial": int(pt['serial']),
+                        "Label": pt['name'],
                         "DateNoticed": c_date.strftime("%Y-%m-%d"),
                         "PrecipNoticed": get_real_weather_data(plant, c_date),
                         "PrecipBefore": get_real_weather_data(plant, c_date - datetime.timedelta(days=1)),
-                        "CoordinateX": int(pt['x']), "CoordinateY": int(pt['y']),
-                        "Timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                        "Base64MapData": "", "DashboardCell": target_cell,
-                        "ReporterEmail": user_email
-                    }
-                    requests.post(POWER_AUTOMATE_URL, json=payload)
-                    time.sleep(1.5)
+                        "CoordinateX": int(pt['x']),
+                        "CoordinateY": int(pt['y'])
+                    })
                 
-                last_pt = st.session_state["new_pins_batch"][-1]
-                c_date = last_pt['start_date']
-                final_payload = {
-                    "Plant": plant, "Serial": int(last_pt['serial']), "Label": last_pt['name'],
-                    "DateNoticed": c_date.strftime("%Y-%m-%d"),
-                    "PrecipNoticed": get_real_weather_data(plant, c_date),
-                    "PrecipBefore": get_real_weather_data(plant, c_date - datetime.timedelta(days=1)),
-                    "CoordinateX": int(last_pt['x']), "CoordinateY": int(last_pt['y']),
-                    "Timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                    "Base64MapData": base64_string, "DashboardCell": target_cell,
-                    "ReporterEmail": user_email
+                # Bundle everything neatly into one single web payload request 
+                master_payload = {
+                    "Plant": plant,
+                    "Timestamp": local_timestamp,
+                    "ReporterEmail": user_email,
+                    "DashboardCell": target_cell,
+                    "Base64MapData": base64_string,
+                    "LeaksArray": leak_items_list  # Sending the complete list together!
                 }
-                requests.post(POWER_AUTOMATE_URL, json=final_payload)
+                
+                # Dispatch single post transaction
+                requests.post(POWER_AUTOMATE_URL, json=master_payload)
                 
                 st.session_state["new_pins_batch"] = []
-                st.success("🎉 Leaks reported successfully!")
+                st.success("🎉 All leaks successfully bundled and processed!")
                 time.sleep(1)
                 st.rerun()
 
@@ -266,7 +262,6 @@ with st.expander("🔒 Administrator History View (Live Database Sync)", expande
     st.subheader(f"📊 Historical Cumulative Leak Map — {plant}")
     
     historical_records = []
-    
     try:
         response = requests.get(f"{EXCEL_FETCH_URL}&cb={time.time()}", timeout=8)
         if response.status_code == 200:
@@ -290,9 +285,9 @@ with st.expander("🔒 Administrator History View (Live Database Sync)", expande
             plant_historical_records.append(r)
 
     if not plant_historical_records:
-        st.info("🍃 The historical database is currently empty. Deleting lines in your Excel table successfully cleared this map layout canvas.")
+        st.info("🍃 The historical database is currently empty.")
     else:
-        st.caption(f"Showing {len(plant_historical_records)} historical leak points pulled directly from your Excel database table.")
+        st.caption(f"Showing {len(plant_historical_records)} historical leak points.")
         
         history_canvas = right_resized.copy()
         draw_history = ImageDraw.Draw(history_canvas)
