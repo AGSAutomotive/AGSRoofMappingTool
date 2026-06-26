@@ -6,6 +6,31 @@ import io
 import datetime
 import requests
 import base64
+import threading
+
+# ------------------------------------------------------------------
+# AUTOMATED KEEP-AWAKE ENGINE (Prevents 12-Hour Idle Sleep)
+# ------------------------------------------------------------------
+def background_ping_loop(url):
+    """Sends a silent web request to the app URL every 30 minutes to reset the sleep clock."""
+    # Give the app a moment to finish launching on startup
+    time.sleep(30)
+    while True:
+        try:
+            # Ping the app URL silently
+            requests.get(url, timeout=10)
+        except Exception:
+            pass
+        # Sleep for 30 minutes (1800 seconds) before pinging again
+        time.sleep(1800)
+
+APP_PUBLIC_URL = "https://agsroofmappingtool.streamlit.app/"
+
+# Start the background thread only once per application server launch
+if "keep_awake_thread_started" not in st.session_state:
+    st.session_state["keep_awake_thread_started"] = True
+    bg_thread = threading.Thread(target=background_ping_loop, args=(APP_PUBLIC_URL,), daemon=True)
+    bg_thread.start()
 
 # ------------------------------------------------------------------
 # CONFIGURATION: Your authenticated live Power Automate URL
