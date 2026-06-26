@@ -7,42 +7,40 @@ import datetime
 import requests
 import base64
 import threading
+import pandas as pd
 
 # ------------------------------------------------------------------
 # AUTOMATED KEEP-AWAKE ENGINE (Prevents 12-Hour Idle Sleep)
 # ------------------------------------------------------------------
 def background_ping_loop(url):
     """Sends a silent web request to the app URL every 30 minutes to reset the sleep clock."""
-    # Give the app a moment to finish launching on startup
     time.sleep(30)
     while True:
         try:
-            # Ping the app URL silently
             requests.get(url, timeout=10)
         except Exception:
             pass
-        # Sleep for 30 minutes (1800 seconds) before pinging again
         time.sleep(1800)
 
 APP_PUBLIC_URL = "https://agsroofmappingtool.streamlit.app/"
 
-# Start the background thread only once per application server launch
 if "keep_awake_thread_started" not in st.session_state:
     st.session_state["keep_awake_thread_started"] = True
     bg_thread = threading.Thread(target=background_ping_loop, args=(APP_PUBLIC_URL,), daemon=True)
     bg_thread.start()
 
 # ------------------------------------------------------------------
-# CONFIGURATION: Your authenticated live Power Automate URL
+# 🔗 CONFIGURATION: Power Automate Endpoints
 # ------------------------------------------------------------------
+# Flow 1: For submitting new leaks (Your existing endpoint)
 POWER_AUTOMATE_URL = "https://default9b2f9cbe865b4df8a5848494d8c1ef.f6.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/47ed5cfbda7d44a3a9ca56f439adaac0/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=QbnMaks1c-bPXRhe7oHTfnKKO_6PdN48H5AvoV1qdYU"
+
+# Flow 2: For retrieving history (PASTE YOUR NEW GET WEBHOOK URL HERE 👇)
+EXCEL_FETCH_URL = "" 
 
 # Set up page layout
 st.set_page_config(page_title="AGS Roof Leak Master Mapper", layout="wide")
 st.title("🏭 AGS Roof Leak Tracking Tool")
-
-# 🎯 RESTORED INFO BLOCK: Guidelines for users dropping pins
-st.info("💡Select plant, then click on the left Floor Map to plot leak locations. Use the dashboard below to rename labels, select dates, and report the leaks.")
 
 # 1. Plant Selection
 plant = st.selectbox("Select Plant:", ['Cambridge - 07', 'Oshawa - 04', 'Windsor - 02'])
@@ -52,6 +50,33 @@ plant_key = plant.replace(' ', '_').replace('-', '_')
 if "new_pins_batch" not in st.session_state or st.session_state.get("current_active_plant") != plant:
     st.session_state["current_active_plant"] = plant
     st.session_state["new_pins_batch"] = []
+    
+# Fallback local state if EXCEL_FETCH_URL isn't set yet
+if "excel_simulated_database" not in st.session_state:
+    st.session_state["excel_simulated_database"] = []
+
+# ------------------------------------------------------------------
+# ⚙️ SIDEBAR MANAGEMENT CONTROL PANEL (Interactive Toggles)
+# ------------------------------------------------------------------
+st.sidebar.title("⚙️ Local Filters & Tools")
+st.sidebar.info("These interactive controls only affect your active mapping session. Other users cannot see your data or your changes.")
+
+# Dynamic view mode toggle
+map_visibility = st.sidebar.radio(
+    "Local Map View Mode:",
+    ["Show All Plotted Pins", "Hide All Pins (Testing Clear Map Mode)"]
+)
+
+# Text Search Filter for local session pins
+search_filter = st.sidebar.text_input("🔍 Filter pins by label text:", "").strip().lower()
+
+# Master local clear canvas testing trigger
+st.sidebar.write("---")
+if st.sidebar.button("🗑️ Wipe Active Canvas State", use_container_width=True):
+    st.session_state["new_pins_batch"] = []
+    st.sidebar.success("Canvas wiped! Ready for a clean testing loop.")
+    time.sleep(1)
+    st.rerun()
 
 # Weather Engine Functionality
 @st.cache_data(ttl=3600)
@@ -105,8 +130,16 @@ draw_right = ImageDraw.Draw(right_display)
 excel_overlay_canvas = Image.new("RGBA", right_resized.size, (255, 255, 255, 0))
 draw_excel = ImageDraw.Draw(excel_overlay_canvas)
 
-# Loop ONLY through the new unsynced points dropped in this specific session
-for pt in st.session_state["new_pins_batch"]:
+# Determine what pins get processed based on sidebar visibility rules
+active_render_pins = []
+if map_visibility == "Show All Plotted Pins":
+    for pt in st.session_state["new_pins_batch"]:
+        if search_filter and search_filter not in pt['name'].lower():
+            continue
+        active_render_pins.append(pt)
+
+# Loop ONLY through the pins cleared by visibility filters
+for pt in active_render_pins:
     x, y, custom_name = pt['x'], pt['y'], pt['name']
     
     # Draw on local App CAD View
@@ -124,7 +157,7 @@ for pt in st.session_state["new_pins_batch"]:
     draw_right.rectangle((bbox_right[0]-4, bbox_right[1]-2, bbox_right[2]+4, bbox_right[3]+2), fill="#1A1A1A", outline="cyan", width=1)
     draw_right.text(text_pos_right, custom_name, fill="cyan")
 
-    # Draw onto the transparent Excel layout layer
+    # Draw onto the transparent Excel layout layer (Always matches what is visually shown)
     draw_excel.ellipse((x-12, y-12, x+12, y+12), outline="cyan", width=3)
     draw_excel.ellipse((x-3, y-3, x+3, y+3), fill="red")
     draw_excel.rectangle((bbox_right[0]-4, bbox_right[1]-2, bbox_right[2]+4, bbox_right[3]+2), fill="#1A1A1A", outline="cyan", width=1)
@@ -157,7 +190,6 @@ st.subheader("📋 New Unreported Leaks")
 if not st.session_state["new_pins_batch"]:
     st.info("💡No new leaks plotted yet for this plant. Click on the left image to plot new leaks.")
 else:
-    # 🎯 RESTORED COLUMN HEADERS GRID
     st.info("💡**Click to rename:** Click directly inside any text box below to customize the leak label or date.")
     grid_header1, grid_header2, grid_header3, grid_header4, grid_header5, grid_header6 = st.columns([1.0, 2.2, 1.8, 2.3, 2.3, 1.4])
     with grid_header3:
@@ -193,7 +225,6 @@ if st.session_state["new_pins_batch"]:
     st.write("---")
     st.info("💡Once all new leaks are plotted, click **'Report Leaks'** button below to save.")
     
-    # Custom CSS injection strictly targeting the primary submit button's text properties
     st.markdown("""
         <style>
             div[data-testid="stButton"] button[kind="primary"] p {
@@ -203,13 +234,11 @@ if st.session_state["new_pins_batch"]:
         </style>
     """, unsafe_allow_html=True)
     
-    # Setup layout column alignment framework to truncate extreme horizontal width expansion
     btn_layout_col, spacer_col = st.columns([2.5, 7.5])
     
     with btn_layout_col:
         if st.button("🚀 Report Leaks", type="primary", use_container_width=True):
             with st.spinner("Uploading and updating consolidated overview maps..."):
-                # Compress and encode the transparent overlay matrix into Png format (to preserve alpha layers)
                 buffer = io.BytesIO()
                 excel_overlay_canvas.save(buffer, format="PNG")
                 base64_string = base64.b64encode(buffer.getvalue()).decode('utf-8')
@@ -217,7 +246,6 @@ if st.session_state["new_pins_batch"]:
                 grid_positions = {'Cambridge___07': "A2", 'Oshawa___04': "M2", 'Windsor___02': "Y2"}
                 target_cell = grid_positions.get(plant_key, "A2")
                 
-                # Send text rows sequentially
                 for pt in st.session_state["new_pins_batch"][:-1]:
                     c_date = pt['start_date']
                     payload = {
@@ -230,9 +258,9 @@ if st.session_state["new_pins_batch"]:
                         "Base64MapData": "", "DashboardCell": target_cell
                     }
                     requests.post(POWER_AUTOMATE_URL, json=payload)
+                    st.session_state["excel_simulated_database"].append(payload)
                     time.sleep(1.5)
                 
-                # Send final payload containing the fresh dots overlay string
                 last_pt = st.session_state["new_pins_batch"][-1]
                 c_date = last_pt['start_date']
                 final_payload = {
@@ -245,9 +273,83 @@ if st.session_state["new_pins_batch"]:
                     "Base64MapData": base64_string, "DashboardCell": target_cell
                 }
                 requests.post(POWER_AUTOMATE_URL, json=final_payload)
+                st.session_state["excel_simulated_database"].append(final_payload)
                 
-                # Wipe local queue so the app returns to a fresh blank slate for the next run
                 st.session_state["new_pins_batch"] = []
                 st.success("🎉 Leaks reported successfully!")
                 time.sleep(1)
+                st.rerun()
+
+# ------------------------------------------------------------------
+# 🔒 DYNAMIC HISTORICAL MAP ENGINE (Renders at Very Bottom)
+# ------------------------------------------------------------------
+st.write("---")
+with st.expander("🔒 Administrator History View (Live Database Sync)", expanded=False):
+    st.subheader(f"📊 Historical Cumulative Leak Map — {plant}")
+    
+    historical_records = []
+    
+    # Fetch live rows via the data engine URL
+    if EXCEL_FETCH_URL:
+        try:
+            # We enforce a small cache breaker timestamp to stop browsers from serving stale layouts
+            response = requests.get(f"{EXCEL_FETCH_URL}&cb={time.time()}", timeout=8)
+            if response.status_code == 200:
+                # Power Automate returns rows inside a container array
+                historical_records = response.json()
+                if not isinstance(historical_records, list):
+                    historical_records = response.json().get("value", [])
+        except Exception as e:
+            st.warning("⚠️ Live database sync is offline. Falling back to temporary local tracking cache.")
+            historical_records = st.session_state["excel_simulated_database"]
+    else:
+        historical_records = st.session_state["excel_simulated_database"]
+
+    # Normalize structure to process correctly
+    plant_historical_records = []
+    for r in historical_records:
+        if str(r.get("Plant", "")).strip() == plant:
+            plant_historical_records.append(r)
+
+    if not plant_historical_records:
+        st.info("🍃 The historical database is currently empty. Deleting lines in your Excel table successfully cleared this map layout canvas.")
+        
+        if st.button("🔄 Reset Local Simulation Tracker Cache"):
+            st.session_state["excel_simulated_database"] = []
+            st.rerun()
+    else:
+        st.caption(f"Showing {len(plant_historical_records)} historical leak points pulled directly from your Excel database table.")
+        
+        history_canvas = right_resized.copy()
+        draw_history = ImageDraw.Draw(history_canvas)
+        
+        for record in plant_historical_records:
+            try:
+                hx = int(float(record["CoordinateX"]))
+                hy = int(float(record["CoordinateY"]))
+                h_label = str(record.get("Label", "Unlabeled Point"))
+                
+                # Plot past elements using custom yellow marker pins
+                draw_history.ellipse((hx-10, hy-10, hx+10, hy+10), outline="yellow", width=2)
+                draw_history.ellipse((hx-3, hy-3, hx+3, hy+3), fill="orange")
+                
+                h_text_pos = (hx + 14, hy - 6)
+                h_bbox = draw_history.textbbox(h_text_pos, h_label)
+                draw_history.rectangle((h_bbox[0]-3, h_bbox[1]-1, h_bbox[2]+3, h_bbox[3]+1), fill="#262730")
+                draw_history.text(h_text_pos, h_label, fill="yellow")
+            except:
+                pass # Safeguard against corrupt row values
+            
+        hist_col1, hist_col2 = st.columns([6.0, 4.0])
+        with hist_col1:
+            st.image(history_canvas, use_container_width=False, caption="Live Cumulative Database History View")
+        with hist_col2:
+            try:
+                df_view = pd.DataFrame(plant_historical_records)[["Serial", "Label", "DateNoticed", "PrecipNoticed"]]
+                st.dataframe(df_view, use_container_width=True, hide_index=True)
+            except:
+                pass
+            
+            if st.button("🗑️ Emergency Reset Simulation Cache"):
+                st.session_state["excel_simulated_database"] = []
                 st.rerun()
