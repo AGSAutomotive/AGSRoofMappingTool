@@ -59,29 +59,6 @@ if "new_pins_batch" not in st.session_state or st.session_state.get("current_act
     st.session_state["current_active_plant"] = plant
     st.session_state["new_pins_batch"] = []
 
-# ------------------------------------------------------------------
-# ⚙️ SIDEBAR MANAGEMENT CONTROL PANEL (Interactive Toggles)
-# ------------------------------------------------------------------
-st.sidebar.title("⚙️ Local Filters & Tools")
-st.sidebar.info("These interactive controls only affect your active mapping session. Other users cannot see your data or your changes.")
-
-# Dynamic view mode toggle
-map_visibility = st.sidebar.radio(
-    "Local Map View Mode:",
-    ["Show All Plotted Pins", "Hide All Pins (Testing Clear Map Mode)"]
-)
-
-# Text Search Filter for local session pins
-search_filter = st.sidebar.text_input("🔍 Filter pins by label text:", "").strip().lower()
-
-# Master local clear canvas testing trigger
-st.sidebar.write("---")
-if st.sidebar.button("🗑️ Wipe Active Canvas State", use_container_width=True):
-    st.session_state["new_pins_batch"] = []
-    st.sidebar.success("Canvas wiped! Ready for a clean testing loop.")
-    time.sleep(1)
-    st.rerun()
-
 # Weather Engine Functionality
 @st.cache_data(ttl=3600)
 def get_real_weather_data(plant_name, target_date):
@@ -134,16 +111,8 @@ draw_right = ImageDraw.Draw(right_display)
 excel_overlay_canvas = Image.new("RGBA", right_resized.size, (255, 255, 255, 0))
 draw_excel = ImageDraw.Draw(excel_overlay_canvas)
 
-# Determine what pins get processed based on sidebar visibility rules
-active_render_pins = []
-if map_visibility == "Show All Plotted Pins":
-    for pt in st.session_state["new_pins_batch"]:
-        if search_filter and search_filter not in pt['name'].lower():
-            continue
-        active_render_pins.append(pt)
-
-# Loop ONLY through the pins cleared by visibility filters
-for pt in active_render_pins:
+# Loop and plot through all active session pins directly
+for pt in st.session_state["new_pins_batch"]:
     x, y, custom_name = pt['x'], pt['y'], pt['name']
     
     # Draw on local App CAD View
@@ -161,7 +130,7 @@ for pt in active_render_pins:
     draw_right.rectangle((bbox_right[0]-4, bbox_right[1]-2, bbox_right[2]+4, bbox_right[3]+2), fill="#1A1A1A", outline="cyan", width=1)
     draw_right.text(text_pos_right, custom_name, fill="cyan")
 
-    # Draw onto the transparent Excel layout layer (Always matches what is visually shown)
+    # Draw onto the transparent Excel layout layer (Isolated session visual capture)
     draw_excel.ellipse((x-12, y-12, x+12, y+12), outline="cyan", width=3)
     draw_excel.ellipse((x-3, y-3, x+3, y+3), fill="red")
     draw_excel.rectangle((bbox_right[0]-4, bbox_right[1]-2, bbox_right[2]+4, bbox_right[3]+2), fill="#1A1A1A", outline="cyan", width=1)
@@ -246,7 +215,6 @@ if st.session_state["new_pins_batch"]:
     btn_layout_col, spacer_col = st.columns([2.5, 7.5])
     
     with btn_layout_col:
-        # The button disables automatically if email validation fails
         if st.button("🚀 Report Leaks", type="primary", use_container_width=True, disabled=not is_email_valid):
             with st.spinner("Uploading and updating consolidated overview maps..."):
                 buffer = io.BytesIO()
@@ -266,7 +234,7 @@ if st.session_state["new_pins_batch"]:
                         "CoordinateX": int(pt['x']), "CoordinateY": int(pt['y']),
                         "Timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                         "Base64MapData": "", "DashboardCell": target_cell,
-                        "ReporterEmail": user_email  # Linked user tracking tag
+                        "ReporterEmail": user_email
                     }
                     requests.post(POWER_AUTOMATE_URL, json=payload)
                     time.sleep(1.5)
@@ -281,7 +249,7 @@ if st.session_state["new_pins_batch"]:
                     "CoordinateX": int(last_pt['x']), "CoordinateY": int(last_pt['y']),
                     "Timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                     "Base64MapData": base64_string, "DashboardCell": target_cell,
-                    "ReporterEmail": user_email  # Linked user tracking tag
+                    "ReporterEmail": user_email
                 }
                 requests.post(POWER_AUTOMATE_URL, json=final_payload)
                 
