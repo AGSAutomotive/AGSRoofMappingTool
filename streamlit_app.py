@@ -32,10 +32,10 @@ if "keep_awake_thread_started" not in st.session_state:
 # ------------------------------------------------------------------
 # 🔗 CONFIGURATION: Power Automate Endpoints
 # ------------------------------------------------------------------
-# Flow 1: For submitting new leaks (Your existing endpoint)
+# Flow 1: For submitting new leaks
 POWER_AUTOMATE_URL = "https://default9b2f9cbe865b4df8a5848494d8c1ef.f6.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/47ed5cfbda7d44a3a9ca56f439adaac0/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=QbnMaks1c-bPXRhe7oHTfnKKO_6PdN48H5AvoV1qdYU"
 
-# Flow 2: For retrieving history (PASTE YOUR NEW GET WEBHOOK URL HERE 👇)
+# Flow 2: For retrieving history
 EXCEL_FETCH_URL = "https://default9b2f9cbe865b4df8a5848494d8c1ef.f6.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/1cada14a49c94756afd2dfa3079ce584/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=eRGiFPth2frXt9B3k9PNGkmSFyf45-bq7fAw-6AniZc" 
 
 # Set up page layout
@@ -50,10 +50,6 @@ plant_key = plant.replace(' ', '_').replace('-', '_')
 if "new_pins_batch" not in st.session_state or st.session_state.get("current_active_plant") != plant:
     st.session_state["current_active_plant"] = plant
     st.session_state["new_pins_batch"] = []
-    
-# Fallback local state if EXCEL_FETCH_URL isn't set yet
-if "excel_simulated_database" not in st.session_state:
-    st.session_state["excel_simulated_database"] = []
 
 # ------------------------------------------------------------------
 # ⚙️ SIDEBAR MANAGEMENT CONTROL PANEL (Interactive Toggles)
@@ -258,7 +254,6 @@ if st.session_state["new_pins_batch"]:
                         "Base64MapData": "", "DashboardCell": target_cell
                     }
                     requests.post(POWER_AUTOMATE_URL, json=payload)
-                    st.session_state["excel_simulated_database"].append(payload)
                     time.sleep(1.5)
                 
                 last_pt = st.session_state["new_pins_batch"][-1]
@@ -273,7 +268,6 @@ if st.session_state["new_pins_batch"]:
                     "Base64MapData": base64_string, "DashboardCell": target_cell
                 }
                 requests.post(POWER_AUTOMATE_URL, json=final_payload)
-                st.session_state["excel_simulated_database"].append(final_payload)
                 
                 st.session_state["new_pins_batch"] = []
                 st.success("🎉 Leaks reported successfully!")
@@ -289,34 +283,34 @@ with st.expander("🔒 Administrator History View (Live Database Sync)", expande
     
     historical_records = []
     
-    # Fetch live rows via the data engine URL
-    if EXCEL_FETCH_URL:
-        try:
-            # We enforce a small cache breaker timestamp to stop browsers from serving stale layouts
-            response = requests.get(f"{EXCEL_FETCH_URL}&cb={time.time()}", timeout=8)
-            if response.status_code == 200:
-                # Power Automate returns rows inside a container array
-                historical_records = response.json()
-                if not isinstance(historical_records, list):
-                    historical_records = response.json().get("value", [])
-        except Exception as e:
-            st.warning("⚠️ Live database sync is offline. Falling back to temporary local tracking cache.")
-            historical_records = st.session_state["excel_simulated_database"]
-    else:
-        historical_records = st.session_state["excel_simulated_database"]
+    try:
+        # Cache breaker applied to ensure immediate updates when rows are altered in Excel
+        response = requests.get(f"{EXCEL_FETCH_URL}&cb={time.time()}", timeout=8)
+        if response.status_code == 200:
+            historical_records = response.json()
+            if not isinstance(historical_records, list):
+                historical_records = response.json().get("value", [])
+    except Exception as e:
+        st.error("⚠️ Failed to communicate with live Power Automate database retriever flow.")
 
-    # Normalize structure to process correctly
+    # Normalize structure and clean Excel serial numbers into standard YYYY/MM/DD strings
     plant_historical_records = []
     for r in historical_records:
         if str(r.get("Plant", "")).strip() == plant:
+            raw_date = r.get("DateNoticed", "")
+            try:
+                # If Excel served a serial timestamp sequence (e.g., 46182)
+                if str(raw_date).isdigit() or isinstance(raw_date, (int, float)):
+                    serial_num = int(float(raw_date))
+                    # Adjusting anchor to sync with Excel's leap-year bug calculation offset
+                    converted_dt = datetime.date(1899, 12, 30) + datetime.timedelta(days=serial_num)
+                    r["DateNoticed"] = converted_dt.strftime("%Y/%m/%d")
+            except Exception:
+                pass
             plant_historical_records.append(r)
 
     if not plant_historical_records:
         st.info("🍃 The historical database is currently empty. Deleting lines in your Excel table successfully cleared this map layout canvas.")
-        
-        if st.button("🔄 Reset Local Simulation Tracker Cache"):
-            st.session_state["excel_simulated_database"] = []
-            st.rerun()
     else:
         st.caption(f"Showing {len(plant_historical_records)} historical leak points pulled directly from your Excel database table.")
         
@@ -329,7 +323,7 @@ with st.expander("🔒 Administrator History View (Live Database Sync)", expande
                 hy = int(float(record["CoordinateY"]))
                 h_label = str(record.get("Label", "Unlabeled Point"))
                 
-                # Plot past elements using custom yellow marker pins
+                # Plot historical assets using distinct yellow/orange styling
                 draw_history.ellipse((hx-10, hy-10, hx+10, hy+10), outline="yellow", width=2)
                 draw_history.ellipse((hx-3, hy-3, hx+3, hy+3), fill="orange")
                 
@@ -338,7 +332,7 @@ with st.expander("🔒 Administrator History View (Live Database Sync)", expande
                 draw_history.rectangle((h_bbox[0]-3, h_bbox[1]-1, h_bbox[2]+3, h_bbox[3]+1), fill="#262730")
                 draw_history.text(h_text_pos, h_label, fill="yellow")
             except:
-                pass # Safeguard against corrupt row values
+                pass 
             
         hist_col1, hist_col2 = st.columns([6.0, 4.0])
         with hist_col1:
@@ -349,7 +343,3 @@ with st.expander("🔒 Administrator History View (Live Database Sync)", expande
                 st.dataframe(df_view, use_container_width=True, hide_index=True)
             except:
                 pass
-            
-            if st.button("🗑️ Emergency Reset Simulation Cache"):
-                st.session_state["excel_simulated_database"] = []
-                st.rerun()
