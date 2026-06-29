@@ -142,7 +142,8 @@ with col1:
         st.session_state["new_pins_batch"].append({
             'id': str(time.time()).replace(".", ""),
             'serial': next_serial, 'x': click['x'], 'y': click['y'],
-            'name': f"Leak Point {next_serial}", 'start_date': datetime.date.today()
+            'name': f"Leak Point {next_serial}", 'start_date': datetime.date.today(),
+            'comments': ""
         })
         st.rerun()
 with col2:
@@ -156,14 +157,20 @@ st.subheader("📋 New Unreported Leaks")
 if not st.session_state["new_pins_batch"]:
     st.info("💡No new leaks plotted yet for this plant. Click on the left image to plot new leaks.")
 else:
-    st.info("💡**Click to rename:** Click directly inside any text box below to customize the leak label or date.")
-    grid_header1, grid_header2, grid_header3, grid_header4, grid_header5, grid_header6 = st.columns([1.0, 2.2, 1.8, 2.3, 2.3, 1.4])
+    st.info("💡**Click to rename or add details:** Customize the leak label, date, or add important comments below.")
+    
+    # Adjusted column ratios to comfortably fit a Comments text box
+    grid_header1, grid_header2, grid_header3, grid_header4, grid_header5, grid_header6, grid_header7 = st.columns([0.8, 1.8, 1.4, 1.8, 1.8, 2.2, 1.2])
     with grid_header3: st.markdown("**📅 Date Noticed**")
-    with grid_header4: st.markdown("**🌦️ Precipitation (Day Noticed)**")
-    with grid_header5: st.markdown("**🌦️ Precipitation (Day Before)**")
+    with grid_header4: st.markdown("**🌦️ Precipitation (Day)**")
+    with grid_header5: st.markdown("**🌦️ Precipitation (Before)**")
+    with grid_header6: st.markdown("**💬 Important Comments / Notes**")
 
     for index, point in enumerate(st.session_state["new_pins_batch"]):
-        c_idx, c_lbl, c_dt, c_w1, c_w2, c_del = st.columns([1.0, 2.2, 1.8, 2.3, 2.3, 1.4])
+        if 'comments' not in point:
+            st.session_state["new_pins_batch"][index]['comments'] = ""
+            
+        c_idx, c_lbl, c_dt, c_w1, c_w2, c_cmt, c_del = st.columns([0.8, 1.8, 1.4, 1.8, 1.8, 2.2, 1.2])
         with c_idx: st.write(f"**#{point['serial']}**")
         with c_lbl:
             new_name = st.text_input("Rename:", value=point['name'], key=f"ren_{point['id']}", label_visibility="collapsed")
@@ -178,6 +185,13 @@ else:
                 
         with c_w1: st.markdown(f"**{get_real_weather_data(plant, chosen_date)}**")
         with c_w2: st.markdown(f"**{get_real_weather_data(plant, chosen_date - datetime.timedelta(days=1))}**")
+        
+        # Live Comments Input Box
+        with c_cmt:
+            new_comment = st.text_input("Comments:", value=point['comments'], placeholder="e.g., Near stamping press, pooling", key=f"cmt_{point['id']}", label_visibility="collapsed")
+            if new_comment != point['comments']:
+                st.session_state["new_pins_batch"][index]['comments'] = new_comment
+        
         with c_del:
             if st.button("🗑️ Remove", key=f"del_{point['id']}", use_container_width=True):
                 st.session_state["new_pins_batch"].pop(index)
@@ -207,16 +221,14 @@ if st.session_state["new_pins_batch"]:
         if st.button("🚀 Report Leaks", type="primary", use_container_width=True, disabled=not is_email_valid):
             with st.spinner("Generating consolidated maps and compiling summary table..."):
                 
-                # Generate the complete image by sandwiching the overlay onto the original satellite image background
                 final_merged_image = right_resized.convert("RGBA")
                 final_merged_image.paste(excel_overlay_canvas, (0, 0), excel_overlay_canvas)
-                final_merged_image = final_merged_image.convert("RGB") # Flatten to standard viewable image format
+                final_merged_image = final_merged_image.convert("RGB")
                 
                 buffer = io.BytesIO()
                 final_merged_image.save(buffer, format="JPEG", quality=90)
                 base64_string = base64.b64encode(buffer.getvalue()).decode('utf-8')
                 
-                # Explicitly force time tracking to local Eastern Time Zone (3:30 PM)
                 local_timestamp = datetime.datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d %H:%M:%S")
                 
                 grid_positions = {'Cambridge___07': "A2", 'Oshawa___04': "M2", 'Windsor___02': "Y2"}
@@ -233,23 +245,21 @@ if st.session_state["new_pins_batch"]:
                         "PrecipNoticed": get_real_weather_data(plant, c_date),
                         "PrecipBefore": get_real_weather_data(plant, c_date - datetime.timedelta(days=1)),
                         "CoordinateX": int(pt['x']),
-                        "CoordinateY": int(pt['y'])
+                        "CoordinateY": int(pt['y']),
+                        "Comments": pt.get('comments', "").strip()
                     })
                 
-                # --- NEW GENERATED EMAIL TABLE CONSTRUCT ENGINE ---
-                # 1. Map tracking metrics directly to an isolation DataFrame
+                # --- GENERATED EMAIL TABLE CONSTRUCT ENGINE ---
                 raw_df = pd.DataFrame(leak_items_list)
                 
-                # 2. Drop columns completely that are irrelevant to notification recipients
+                # Drop structural tracking columns, keeping Comments visible
                 email_df = raw_df.drop(columns=["Serial", "CoordinateX", "CoordinateY"], errors="ignore")
                 
-                # 3. Restructure header mapping values for polished corporate views
-                email_df.columns = ["Leak Description", "Date Noticed", "Precipitation (Day Noticed)", "Precipitation (Day Before)"]
+                # Give columns clean professional formatting headers
+                email_df.columns = ["Leak Description", "Date Noticed", "Precipitation (Day)", "Precipitation (Before)", "Comments / Actions Needed"]
                 
-                # 4. Compile cleanly to HTML rows
                 html_table_body = email_df.to_html(index=False, classes="clean-notification-table", escape=False)
                 
-                # 5. Inject spatial padding variables to structure scannable layout boundaries
                 styled_email_table = f"""
                 <style>
                     .clean-notification-table {{
@@ -264,12 +274,12 @@ if st.session_state["new_pins_batch"]:
                         color: #ffffff;
                         font-weight: bold;
                         text-align: left;
-                        padding: 12px 24px;  /* Spaced column walls */
+                        padding: 12px 24px;
                         border: 1px solid #002244;
-                        min-width: 150px;    /* Prevents horizontal crowding */
+                        min-width: 140px;
                     }}
                     .clean-notification-table td {{
-                        padding: 10px 24px;  /* Even cell body breathing room */
+                        padding: 10px 24px;
                         border: 1px solid #dddddd;
                         text-align: left;
                         vertical-align: middle;
@@ -281,18 +291,16 @@ if st.session_state["new_pins_batch"]:
                 {html_table_body}
                 """
                 
-                # Bundle everything neatly into one single web payload request 
                 master_payload = {
                     "Plant": plant,
                     "Timestamp": local_timestamp,
                     "ReporterEmail": user_email,
                     "DashboardCell": target_cell,
                     "Base64MapData": base64_string,
-                    "LeaksArray": leak_items_list,       # Keeps database sync operations happy
-                    "EmailTableHTML": styled_email_table # New formatted string for the Power Automate email action!
+                    "LeaksArray": leak_items_list,       
+                    "EmailTableHTML": styled_email_table 
                 }
                 
-                # Dispatch single post transaction
                 requests.post(POWER_AUTOMATE_URL, json=master_payload)
                 
                 st.session_state["new_pins_batch"] = []
