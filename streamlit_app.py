@@ -367,7 +367,17 @@ with st.expander("🔒 Administrator History View (Live Database Sync)", expande
             st.image(history_canvas, use_container_width=False, caption="Live Cumulative Database History View")
         with hist_col2:
             try:
-                df_view = pd.DataFrame(plant_historical_records)[["Serial", "Label", "DateNoticed", "PrecipNoticed"]]
+                # Transformed historical dataframe to hide 'Serial' and display 'Comments'
+                df_view = pd.DataFrame(plant_historical_records)
+                
+                # Handle cases where the spreadsheet doesn't have a record yet safely
+                if "Comments" not in df_view.columns:
+                    df_view["Comments"] = ""
+                
+                # Explicitly pull the target columns and rename neatly
+                df_view = df_view[["Label", "DateNoticed", "PrecipNoticed", "Comments"]]
+                df_view.columns = ["Leak Description", "Date Noticed", "Precipitation", "Comments / Notes"]
+                
                 st.dataframe(df_view, use_container_width=True, hide_index=True)
-            except:
-                pass
+            except Exception as table_err:
+                st.caption("Unable to format history grid columns. Raw attributes might be initializing.")
