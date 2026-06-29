@@ -207,7 +207,7 @@ if st.session_state["new_pins_batch"]:
         if st.button("🚀 Report Leaks", type="primary", use_container_width=True, disabled=not is_email_valid):
             with st.spinner("Generating consolidated maps and compiling summary table..."):
                 
-                # 🛠️ FIX 2: Generate the complete image by sandwiching the overlay onto the original satellite image background
+                # Generate the complete image by sandwiching the overlay onto the original satellite image background
                 final_merged_image = right_resized.convert("RGBA")
                 final_merged_image.paste(excel_overlay_canvas, (0, 0), excel_overlay_canvas)
                 final_merged_image = final_merged_image.convert("RGB") # Flatten to standard viewable image format
@@ -216,13 +216,13 @@ if st.session_state["new_pins_batch"]:
                 final_merged_image.save(buffer, format="JPEG", quality=90)
                 base64_string = base64.b64encode(buffer.getvalue()).decode('utf-8')
                 
-                # 🛠️ FIX 1: Explicitly force time tracking to local Eastern Time Zone (3:30 PM)
+                # Explicitly force time tracking to local Eastern Time Zone (3:30 PM)
                 local_timestamp = datetime.datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d %H:%M:%S")
                 
                 grid_positions = {'Cambridge___07': "A2", 'Oshawa___04': "M2", 'Windsor___02': "Y2"}
                 target_cell = grid_positions.get(plant_key, "A2")
                 
-                # 🛠️ FIX 3: Package ALL itemized points together into a structured dynamic data array
+                # Package ALL itemized points together into a structured dynamic data array
                 leak_items_list = []
                 for pt in st.session_state["new_pins_batch"]:
                     c_date = pt['start_date']
@@ -236,6 +236,51 @@ if st.session_state["new_pins_batch"]:
                         "CoordinateY": int(pt['y'])
                     })
                 
+                # --- NEW GENERATED EMAIL TABLE CONSTRUCT ENGINE ---
+                # 1. Map tracking metrics directly to an isolation DataFrame
+                raw_df = pd.DataFrame(leak_items_list)
+                
+                # 2. Drop columns completely that are irrelevant to notification recipients
+                email_df = raw_df.drop(columns=["Serial", "CoordinateX", "CoordinateY"], errors="ignore")
+                
+                # 3. Restructure header mapping values for polished corporate views
+                email_df.columns = ["Leak Description", "Date Noticed", "Precipitation (Day Noticed)", "Precipitation (Day Before)"]
+                
+                # 4. Compile cleanly to HTML rows
+                html_table_body = email_df.to_html(index=False, classes="clean-notification-table", escape=False)
+                
+                # 5. Inject spatial padding variables to structure scannable layout boundaries
+                styled_email_table = f"""
+                <style>
+                    .clean-notification-table {{
+                        border-collapse: collapse;
+                        width: 100%;
+                        font-family: Calibri, Arial, sans-serif;
+                        font-size: 14px;
+                        margin: 16px 0;
+                    }}
+                    .clean-notification-table th {{
+                        background-color: #003366;
+                        color: #ffffff;
+                        font-weight: bold;
+                        text-align: left;
+                        padding: 12px 24px;  /* Spaced column walls */
+                        border: 1px solid #002244;
+                        min-width: 150px;    /* Prevents horizontal crowding */
+                    }}
+                    .clean-notification-table td {{
+                        padding: 10px 24px;  /* Even cell body breathing room */
+                        border: 1px solid #dddddd;
+                        text-align: left;
+                        vertical-align: middle;
+                    }}
+                    .clean-notification-table tr:nth-child(even) {{
+                        background-color: #f9f9f9;
+                    }}
+                </style>
+                {html_table_body}
+                """
+                
                 # Bundle everything neatly into one single web payload request 
                 master_payload = {
                     "Plant": plant,
@@ -243,7 +288,8 @@ if st.session_state["new_pins_batch"]:
                     "ReporterEmail": user_email,
                     "DashboardCell": target_cell,
                     "Base64MapData": base64_string,
-                    "LeaksArray": leak_items_list  # Sending the complete list together!
+                    "LeaksArray": leak_items_list,       # Keeps database sync operations happy
+                    "EmailTableHTML": styled_email_table # New formatted string for the Power Automate email action!
                 }
                 
                 # Dispatch single post transaction
