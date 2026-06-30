@@ -191,6 +191,7 @@ else:
             new_comment = st.text_input("Comments:", value=point['comments'], placeholder="e.g., Near stamping press, pooling", key=f"cmt_{point['id']}", label_visibility="collapsed")
             if new_comment != point['comments']:
                 st.session_state["new_pins_batch"][index]['comments'] = new_comment
+                st.rerun()
         
         with c_del:
             if st.button("🗑️ Remove", key=f"del_{point['id']}", use_container_width=True):
