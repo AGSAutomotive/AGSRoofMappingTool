@@ -140,7 +140,7 @@ with col1:
         next_serial = len(st.session_state["new_pins_batch"]) + 1
         
         st.session_state["new_pins_batch"].append({
-            'id': str(time.time()).replace(".", ""),
+            'id': str(time.time()).replace(".", ""), 
             'serial': next_serial, 'x': click['x'], 'y': click['y'],
             'name': f"Leak Point {next_serial}", 'start_date': datetime.date.today(),
             'comments': ""
@@ -304,7 +304,7 @@ if st.session_state["new_pins_batch"]:
                 requests.post(POWER_AUTOMATE_URL, json=master_payload)
                 
                 st.session_state["new_pins_batch"] = []
-                st.success("🎉 All leaks successfully bundled and processed!")
+                st.success("🎉 All leaks successfully reported!")
                 time.sleep(1)
                 st.rerun()
 
@@ -313,7 +313,7 @@ if st.session_state["new_pins_batch"]:
 # ------------------------------------------------------------------
 st.write("---")
 with st.expander("🔒 Administrator History View (Live Database Sync)", expanded=False):
-    st.subheader(f"📊 Historical Cumulative Leak Map — {plant}")
+    st.subheader(f"📊 Historical Leak Map — {plant}")
     
     historical_records = []
     try:
