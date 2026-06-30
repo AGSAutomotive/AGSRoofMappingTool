@@ -162,8 +162,8 @@ else:
     # Adjusted column ratios to comfortably fit a Comments text box
     grid_header1, grid_header2, grid_header3, grid_header4, grid_header5, grid_header6, grid_header7 = st.columns([0.8, 1.8, 1.4, 1.8, 1.8, 2.2, 1.2])
     with grid_header3: st.markdown("**📅 Date Noticed**")
-    with grid_header4: st.markdown("**🌦️ Precipitation (Day)**")
-    with grid_header5: st.markdown("**🌦️ Precipitation (Before)**")
+    with grid_header4: st.markdown("**🌦️ Precipitation (Day Noticed)**")
+    with grid_header5: st.markdown("**🌦️ Precipitation (Day Before)**")
     with grid_header6: st.markdown("**💬 Important Comments / Notes**")
 
     for index, point in enumerate(st.session_state["new_pins_batch"]):
