@@ -19,6 +19,7 @@ EXCEL_FETCH_URL = "https://default9b2f9cbe865b4df8a5848494d8c1ef.f6.environment.
 
 st.set_page_config(page_title="AGS Roof Leak Master Mapper", layout="wide")
 st.title("🏭 AGS Roof Leak Tracking Tool")
+ st.info("💡Select plant from the dropdown and enter your AGS email. Then click anywhere on the **floor map** view plot a leak. Use the dashboard below to edit details.")
 
 # 1. User & Plant Info Inputs
 col_p1, col_p2 = st.columns([4.0, 6.0])
