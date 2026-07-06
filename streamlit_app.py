@@ -299,7 +299,7 @@ with st.expander("🔒 Administrator History View (Live Database Sync)", expande
     
     historical_records = []
     try:
-        response = requests.get(f"{EXCEL_FETCH_URL}&cb={time.time()}", timeout=8)
+        response = requests.get(f"{EXCEL_FETCH_URL}&cb={time.time()}", timeout=60)
         if response.status_code == 200:
             historical_records = response.json()
             if not isinstance(historical_records, list):
