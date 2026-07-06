@@ -10,25 +10,6 @@ import base64
 import threading
 import pandas as pd
 
-# ------------------------------------------------------------------
-# AUTOMATED KEEP-AWAKE ENGINE (Prevents 12-Hour Idle Sleep)
-# ------------------------------------------------------------------
-def background_ping_loop(url):
-    """Sends a silent web request to the app URL every 30 minutes to reset the sleep clock."""
-    time.sleep(30)
-    while True:
-        try:
-            requests.get(url, timeout=10)
-        except Exception:
-            pass
-        time.sleep(1800)
-
-APP_PUBLIC_URL = "https://agsroofmappingtool.streamlit.app/"
-
-if "keep_awake_thread_started" not in st.session_state:
-    st.session_state["keep_awake_thread_started"] = True
-    bg_thread = threading.Thread(target=background_ping_loop, args=(APP_PUBLIC_URL,), daemon=True)
-    bg_thread.start()
 
 # ------------------------------------------------------------------
 # 🔗 CONFIGURATION: Power Automate Endpoints
