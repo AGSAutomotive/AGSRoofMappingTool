@@ -24,9 +24,12 @@ st.info("💡Select plant from the dropdown and enter your AGS email. Then click
 # 1. User & Plant Info Inputs
 col_p1, col_p2 = st.columns([4.0, 6.0])
 with col_p1:
-    # Added 'Sterling South' to the selection menu
     plant = st.selectbox("Select Plant:", ['Cambridge - 07', 'Oshawa - 04', 'Sterling South', 'Windsor - 02'])
     plant_key = plant.replace(' ', '_').replace('-', '_')
+    
+    # --- ADDED: Dynamic Size Toggle Placement ---
+    enlarge_map = st.checkbox("🔍 Enlarge Map View (For Detailed Plotting)")
+    
 with col_p2:
     user_email = st.text_input("📋 Enter your AGS Automotive Email:", placeholder="username@agsautomotive.com").strip().lower()
 
@@ -39,7 +42,6 @@ if "new_pins_batch" not in st.session_state or st.session_state.get("current_act
 # Weather Engine Functionality
 @st.cache_data(ttl=3600)
 def get_real_weather_data(plant_name, target_date):
-    # Added exact coordinate mappings for Sterling South (42.542228, -83.041669)
     coordinates = {
         'Cambridge - 07': {"lat": 43.403449, "lon": -80.322832},
         'Oshawa - 04': {"lat": 43.876437, "lon": -78.848991},
@@ -75,7 +77,10 @@ try:
 
     left_img = Image.open(left_path).convert("RGB")
     right_img = Image.open(right_path).convert("RGB")
-    DISPLAY_WIDTH = 600
+    
+    # --- UPDATED: Configured dynamically based on checkbox state ---
+    DISPLAY_WIDTH = 950 if enlarge_map else 600
+    
     left_resized = left_img.resize((DISPLAY_WIDTH, int(left_img.height * (DISPLAY_WIDTH / left_img.width))))
     right_resized = right_img.resize((DISPLAY_WIDTH, int(right_img.height * (DISPLAY_WIDTH / right_img.width))))
 except Exception as e:
@@ -219,7 +224,6 @@ if st.session_state["new_pins_batch"]:
                 
                 local_timestamp = datetime.datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d %H:%M:%S")
                 
-                # Added dynamic target column cell placement for Sterling South ("AK2")
                 grid_positions = {'Cambridge___07': "A2", 'Oshawa___04': "M2", 'Sterling_South': "AK2", 'Windsor___02': "Y2"}
                 target_cell = grid_positions.get(plant_key, "A2")
                 
@@ -356,14 +360,11 @@ with st.expander("🔒 Administrator History View (Live Database Sync)", expande
             st.image(history_canvas, use_container_width=False, caption="Live Cumulative Database History View")
         with hist_col2:
             try:
-                # Transformed historical dataframe to hide 'Serial' and display 'Comments'
                 df_view = pd.DataFrame(plant_historical_records)
                 
-                # Handle cases where the spreadsheet doesn't have a record yet safely
                 if "Comments" not in df_view.columns:
                     df_view["Comments"] = ""
                 
-                # Explicitly pull the target columns and rename neatly
                 df_view = df_view[["Label", "DateNoticed", "PrecipNoticed", "Comments"]]
                 df_view.columns = ["Leak Description", "Date Noticed", "Precipitation", "Comments / Notes"]
                 
