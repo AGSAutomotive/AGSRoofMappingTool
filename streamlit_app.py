@@ -24,12 +24,9 @@ st.info("💡Select plant from the dropdown and enter your AGS email. Then click
 # 1. User & Plant Info Inputs
 col_p1, col_p2 = st.columns([4.0, 6.0])
 with col_p1:
+    # Added 'Sterling South' to the selection menu
     plant = st.selectbox("Select Plant:", ['Cambridge - 07', 'Oshawa - 04', 'Sterling South', 'Windsor - 02'])
     plant_key = plant.replace(' ', '_').replace('-', '_')
-    
-    # Keeps the quick enlargement option check box
-    enlarge_map = st.checkbox("🔍 Enlarge Map View (For Detailed Plotting)")
-    
 with col_p2:
     user_email = st.text_input("📋 Enter your AGS Automotive Email:", placeholder="username@agsautomotive.com").strip().lower()
 
@@ -42,6 +39,7 @@ if "new_pins_batch" not in st.session_state or st.session_state.get("current_act
 # Weather Engine Functionality
 @st.cache_data(ttl=3600)
 def get_real_weather_data(plant_name, target_date):
+    # Added exact coordinate mappings for Sterling South (42.542228, -83.041669)
     coordinates = {
         'Cambridge - 07': {"lat": 43.403449, "lon": -80.322832},
         'Oshawa - 04': {"lat": 43.876437, "lon": -78.848991},
@@ -77,25 +75,7 @@ try:
 
     left_img = Image.open(left_path).convert("RGB")
     right_img = Image.open(right_path).convert("RGB")
-    
-    # --- ADDED: Granular Layout Width Slider Bar ---
-    # Sets default canvas scaling bounds depending on if the checkbox is checked or unchecked
-    min_w = 950 if enlarge_map else 600
-    max_w = 1800 if enlarge_map else 1200
-    start_w = 1200 if enlarge_map else 800
-    
-    st.write("")  # Tight layout padding buffer
-    map_scale_slider = st.slider(
-        "↔️ Adjust Image Display Width Scale (Pixels):", 
-        min_value=min_w, 
-        max_value=max_w, 
-        value=start_w, 
-        step=50,
-        key=f"slider_{plant_key}"
-    )
-    DISPLAY_WIDTH = map_scale_slider
-    # --------------------------------------------
-    
+    DISPLAY_WIDTH = 600
     left_resized = left_img.resize((DISPLAY_WIDTH, int(left_img.height * (DISPLAY_WIDTH / left_img.width))))
     right_resized = right_img.resize((DISPLAY_WIDTH, int(right_img.height * (DISPLAY_WIDTH / right_img.width))))
 except Exception as e:
@@ -136,34 +116,33 @@ for pt in st.session_state["new_pins_batch"]:
     draw_excel.rectangle((bbox_right[0]-4, bbox_right[1]-2, bbox_right[2]+4, bbox_right[3]+2), fill="#1A1A1A", outline="cyan", width=1)
     draw_excel.text(text_pos_right, custom_name, fill="cyan")
 
-# --- UPDATED: Vertically Stacked Canvas Layout View ---
+# Display Side-by-Side Images
 st.write("---")
-
-st.subheader("🗺️ Floor Map")
-click = streamlit_image_coordinates(left_display, key=f"click_{plant_key}")
-if click and click != st.session_state.get(f"lclick_{plant_key}"):
-    st.session_state[f"lclick_{plant_key}"] = click
-    next_serial = len(st.session_state["new_pins_batch"]) + 1
-    
-    st.session_state["new_pins_batch"].append({
-        'id': str(time.time()).replace(".", ""), 
-        'serial': next_serial, 'x': click['x'], 'y': click['y'],
-        'name': f"Leak Point {next_serial}", 'start_date': datetime.date.today(),
-        'comments': ""
-    })
-    st.rerun()
-
-st.write("---")
-st.subheader("🦅 Roof View")
-st.image(right_display)
-# -----------------------------------------------------
+col1, col2 = st.columns(2)
+with col1:
+    st.subheader("🗺️ Floor Map")
+    click = streamlit_image_coordinates(left_display, key=f"click_{plant_key}")
+    if click and click != st.session_state.get(f"lclick_{plant_key}"):
+        st.session_state[f"lclick_{plant_key}"] = click
+        next_serial = len(st.session_state["new_pins_batch"]) + 1
+        
+        st.session_state["new_pins_batch"].append({
+            'id': str(time.time()).replace(".", ""), 
+            'serial': next_serial, 'x': click['x'], 'y': click['y'],
+            'name': f"Leak Point {next_serial}", 'start_date': datetime.date.today(),
+            'comments': ""
+        })
+        st.rerun()
+with col2:
+    st.subheader("🦅 Roof View")
+    st.image(right_display)
 
 # --- Grid Form Layout Area ---
 st.write("---")
 st.subheader("📋 New Unreported Leaks")
 
 if not st.session_state["new_pins_batch"]:
-    st.info("💡No new leaks plotted yet for this plant. Click on the floor map image above to plot new leaks.")
+    st.info("💡No new leaks plotted yet for this plant. Click on the left image to plot new leaks.")
 else:
     st.info("💡**Click to rename or add details:** Customize the leak label, date, or add important comments below.")
     
@@ -240,6 +219,7 @@ if st.session_state["new_pins_batch"]:
                 
                 local_timestamp = datetime.datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d %H:%M:%S")
                 
+                # Added dynamic target column cell placement for Sterling South ("AK2")
                 grid_positions = {'Cambridge___07': "A2", 'Oshawa___04': "M2", 'Sterling_South': "AK2", 'Windsor___02': "Y2"}
                 target_cell = grid_positions.get(plant_key, "A2")
                 
@@ -371,18 +351,22 @@ with st.expander("🔒 Administrator History View (Live Database Sync)", expande
             except:
                 pass 
             
-        # Also stacked the administration history display components vertically for widescreen scanning efficiency
-        st.image(history_canvas, use_container_width=False, caption="Live Cumulative Database History View")
-        st.write("")
-        try:
-            df_view = pd.DataFrame(plant_historical_records)
-            
-            if "Comments" not in df_view.columns:
-                df_view["Comments"] = ""
-            
-            df_view = df_view[["Label", "DateNoticed", "PrecipNoticed", "Comments"]]
-            df_view.columns = ["Leak Description", "Date Noticed", "Precipitation", "Comments / Notes"]
-            
-            st.dataframe(df_view, use_container_width=True, hide_index=True)
-        except Exception as table_err:
-            st.caption("Unable to format history grid columns. Raw attributes might be initializing.")
+        hist_col1, hist_col2 = st.columns([6.0, 4.0])
+        with hist_col1:
+            st.image(history_canvas, use_container_width=False, caption="Live Cumulative Database History View")
+        with hist_col2:
+            try:
+                # Transformed historical dataframe to hide 'Serial' and display 'Comments'
+                df_view = pd.DataFrame(plant_historical_records)
+                
+                # Handle cases where the spreadsheet doesn't have a record yet safely
+                if "Comments" not in df_view.columns:
+                    df_view["Comments"] = ""
+                
+                # Explicitly pull the target columns and rename neatly
+                df_view = df_view[["Label", "DateNoticed", "PrecipNoticed", "Comments"]]
+                df_view.columns = ["Leak Description", "Date Noticed", "Precipitation", "Comments / Notes"]
+                
+                st.dataframe(df_view, use_container_width=True, hide_index=True)
+            except Exception as table_err:
+                st.caption("Unable to format history grid columns. Raw attributes might be initializing.")
