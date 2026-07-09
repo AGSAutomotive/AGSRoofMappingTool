@@ -21,15 +21,40 @@ st.set_page_config(page_title="AGS Roof Leak Master Mapper", layout="wide")
 st.title("🏭 AGS Roof Leak Tracking Tool")
 st.info("💡Select plant from the dropdown and enter your AGS email. Then click anywhere on the **floor map** image to plot a leak. Scroll down to to edit more details and submit a report.")
 
-# Injection of custom CSS to allow overflow scrolling within specific map containers
+# Injection of custom CSS to force visible, draggable scrollbars for mouse users
 st.markdown("""
     <style>
         .scrollable-map-container {
             overflow: auto !important;
             max-height: 600px;
             max-width: 100%;
-            border: 1px solid #ccc;
+            border: 2px solid #003366; /* Bold border to indicate a separate window workspace */
             border-radius: 4px;
+        }
+        
+        /* FORCE SCROLLBARS TO STAY CONSTANTLY VISIBLE */
+        .scrollable-map-container::-webkit-scrollbar {
+            width: 14px;          /* Vertical scrollbar thickness */
+            height: 14px;         /* Horizontal scrollbar thickness */
+            display: block !important;
+        }
+
+        /* The background track behind the draggable bar */
+        .scrollable-map-container::-webkit-scrollbar-track {
+            background: #f1f1f1 !important;
+            border-radius: 4px;
+        }
+
+        /* The actual draggable bar element (The Thumb) */
+        .scrollable-map-container::-webkit-scrollbar-thumb {
+            background: #003366 !important; /* Matches AGS corporate blue style */
+            border-radius: 4px;
+            border: 2px solid #f1f1f1;
+        }
+
+        /* Darkens the bar slightly when a plant worker hovers over it */
+        .scrollable-map-container::-webkit-scrollbar-thumb:hover {
+            background: #002244 !important;
         }
     </style>
 """, unsafe_allow_html=True)
