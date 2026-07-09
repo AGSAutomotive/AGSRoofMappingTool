@@ -21,12 +21,28 @@ st.set_page_config(page_title="AGS Roof Leak Master Mapper", layout="wide")
 st.title("🏭 AGS Roof Leak Tracking Tool")
 st.info("💡Select plant from the dropdown and enter your AGS email. Then click anywhere on the **floor map** image to plot a leak. Scroll down to to edit more details and submit a report.")
 
+# Injection of custom CSS to allow overflow scrolling within specific map containers
+st.markdown("""
+    <style>
+        .scrollable-map-container {
+            overflow: auto !important;
+            max-height: 600px;
+            max-width: 100%;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+    </style>
+""", unsafe_allow_html=True)
+
 # 1. User & Plant Info Inputs
 col_p1, col_p2 = st.columns([4.0, 6.0])
 with col_p1:
-    # Added 'Sterling South' to the selection menu
     plant = st.selectbox("Select Plant:", ['Cambridge - 07', 'Oshawa - 04', 'Sterling South', 'Windsor - 02'])
     plant_key = plant.replace(' ', '_').replace('-', '_')
+    
+    # Checkbox to let them scale the map resolution up inside the scrolling viewport
+    enlarge_map = st.checkbox("🔍 Toggle High-Zoom CAD Workspace (Enables Scrolling)")
+    
 with col_p2:
     user_email = st.text_input("📋 Enter your AGS Automotive Email:", placeholder="username@agsautomotive.com").strip().lower()
 
@@ -39,7 +55,6 @@ if "new_pins_batch" not in st.session_state or st.session_state.get("current_act
 # Weather Engine Functionality
 @st.cache_data(ttl=3600)
 def get_real_weather_data(plant_name, target_date):
-    # Added exact coordinate mappings for Sterling South (42.542228, -83.041669)
     coordinates = {
         'Cambridge - 07': {"lat": 43.403449, "lon": -80.322832},
         'Oshawa - 04': {"lat": 43.876437, "lon": -78.848991},
@@ -75,9 +90,14 @@ try:
 
     left_img = Image.open(left_path).convert("RGB")
     right_img = Image.open(right_path).convert("RGB")
-    DISPLAY_WIDTH = 600
-    left_resized = left_img.resize((DISPLAY_WIDTH, int(left_img.height * (DISPLAY_WIDTH / left_img.width))))
-    right_resized = right_img.resize((DISPLAY_WIDTH, int(right_img.height * (DISPLAY_WIDTH / right_img.width))))
+    
+    # If zoom mode is checked, make the left map canvas massive (e.g. 1500px), 
+    # but the style container handles keeping it tightly constrained on screen.
+    CAD_WIDTH = 1500 if enlarge_map else 600
+    ROOF_WIDTH = 600
+    
+    left_resized = left_img.resize((CAD_WIDTH, int(left_img.height * (CAD_WIDTH / left_img.width))))
+    right_resized = right_img.resize((ROOF_WIDTH, int(right_img.height * (ROOF_WIDTH / right_img.width))))
 except Exception as e:
     st.error(f"⚠️ Base asset missing inside data/ directory: {e}")
     st.stop()
@@ -102,26 +122,39 @@ for pt in st.session_state["new_pins_batch"]:
     draw_left.rectangle((bbox_left[0]-4, bbox_left[1]-2, bbox_left[2]+4, bbox_left[3]+2), fill="white", outline="red", width=1)
     draw_left.text(text_pos_left, custom_name, fill="red")
     
+    # Scale coordinates proportionally for the static roof map projection
+    rx = int(x * (ROOF_WIDTH / CAD_WIDTH))
+    ry = int(y * (int(right_img.height * (ROOF_WIDTH / right_img.width)) / int(left_img.height * (CAD_WIDTH / left_img.width))))
+    
     # Draw on local App Satellite Roof View
-    draw_right.ellipse((x-12, y-12, x+12, y+12), outline="cyan", width=3)
-    draw_right.ellipse((x-3, y-3, x+3, y+3), fill="red")
-    text_pos_right = (x + 16, y - 8)
+    draw_right.ellipse((rx-12, ry-12, rx+12, ry+12), outline="cyan", width=3)
+    draw_right.ellipse((rx-3, ry-3, rx+3, ry+3), fill="red")
+    text_pos_right = (rx + 16, ry - 8)
     bbox_right = draw_right.textbbox(text_pos_right, custom_name)
     draw_right.rectangle((bbox_right[0]-4, bbox_right[1]-2, bbox_right[2]+4, bbox_right[3]+2), fill="#1A1A1A", outline="cyan", width=1)
     draw_right.text(text_pos_right, custom_name, fill="cyan")
 
     # Draw onto transparent overlay layer
-    draw_excel.ellipse((x-12, y-12, x+12, y+12), outline="cyan", width=3)
-    draw_excel.ellipse((x-3, y-3, x+3, y+3), fill="red")
+    draw_excel.ellipse((rx-12, ry-12, rx+12, ry+12), outline="cyan", width=3)
+    draw_excel.ellipse((rx-3, ry-3, rx+3, ry+3), fill="red")
     draw_excel.rectangle((bbox_right[0]-4, bbox_right[1]-2, bbox_right[2]+4, bbox_right[3]+2), fill="#1A1A1A", outline="cyan", width=1)
     draw_excel.text(text_pos_right, custom_name, fill="cyan")
 
-# Display Side-by-Side Images
+# --- Side-by-Side View with Scroll Window Injection ---
 st.write("---")
 col1, col2 = st.columns(2)
 with col1:
     st.subheader("🗺️ Floor Map")
+    
+    # Creates a scrollable window div if high-zoom layout is checked
+    if enlarge_map:
+        st.markdown('<div class="scrollable-map-container">', unsafe_allow_html=True)
+        
     click = streamlit_image_coordinates(left_display, key=f"click_{plant_key}")
+    
+    if enlarge_map:
+        st.markdown('</div>', unsafe_allow_html=True)
+        
     if click and click != st.session_state.get(f"lclick_{plant_key}"):
         st.session_state[f"lclick_{plant_key}"] = click
         next_serial = len(st.session_state["new_pins_batch"]) + 1
@@ -146,7 +179,6 @@ if not st.session_state["new_pins_batch"]:
 else:
     st.info("💡**Click to rename or add details:** Customize the leak label, date, or add important comments below.")
     
-    # Adjusted column ratios to comfortably fit a Comments text box
     grid_header1, grid_header2, grid_header3, grid_header4, grid_header5, grid_header6, grid_header7 = st.columns([0.8, 1.8, 1.4, 1.8, 1.8, 2.2, 1.2])
     with grid_header3: st.markdown("**📅 Date Noticed**")
     with grid_header4: st.markdown("**🌦️ Precipitation (Day Noticed)**")
@@ -173,7 +205,6 @@ else:
         with c_w1: st.markdown(f"**{get_real_weather_data(plant, chosen_date)}**")
         with c_w2: st.markdown(f"**{get_real_weather_data(plant, chosen_date - datetime.timedelta(days=1))}**")
         
-        # Live Comments Input Box
         with c_cmt:
             new_comment = st.text_input("Comments:", value=point['comments'], placeholder="e.g., Near stamping press, pooling", key=f"cmt_{point['id']}", label_visibility="collapsed")
             if new_comment != point['comments']:
@@ -219,32 +250,29 @@ if st.session_state["new_pins_batch"]:
                 
                 local_timestamp = datetime.datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d %H:%M:%S")
                 
-                # Added dynamic target column cell placement for Sterling South ("AK2")
                 grid_positions = {'Cambridge___07': "A2", 'Oshawa___04': "M2", 'Sterling_South': "AK2", 'Windsor___02': "Y2"}
                 target_cell = grid_positions.get(plant_key, "A2")
                 
-                # Package ALL itemized points together into a structured dynamic data array
                 leak_items_list = []
                 for pt in st.session_state["new_pins_batch"]:
                     c_date = pt['start_date']
+                    # Recalculate original coordinates back to the baseline tracking grid size for uniform storage
+                    stored_x = int(pt['x'] * (600 / CAD_WIDTH))
+                    stored_y = int(pt['y'] * (int(left_img.height * (600 / left_img.width)) / int(left_img.height * (CAD_WIDTH / left_img.width))))
+                    
                     leak_items_list.append({
                         "Serial": int(pt['serial']),
                         "Label": pt['name'],
                         "DateNoticed": c_date.strftime("%Y-%m-%d"),
                         "PrecipNoticed": get_real_weather_data(plant, c_date),
                         "PrecipBefore": get_real_weather_data(plant, c_date - datetime.timedelta(days=1)),
-                        "CoordinateX": int(pt['x']),
-                        "CoordinateY": int(pt['y']),
+                        "CoordinateX": stored_x,
+                        "CoordinateY": stored_y,
                         "Comments": pt.get('comments', "").strip()
                     })
                 
-                # --- GENERATED EMAIL TABLE CONSTRUCT ENGINE ---
                 raw_df = pd.DataFrame(leak_items_list)
-                
-                # Drop structural tracking columns, keeping Comments visible
                 email_df = raw_df.drop(columns=["Serial", "CoordinateX", "CoordinateY"], errors="ignore")
-                
-                # Give columns clean professional formatting headers
                 email_df.columns = ["Leak Description", "Date Noticed", "Precipitation (Day)", "Precipitation (Before)", "Comments / Actions Needed"]
                 
                 html_table_body = email_df.to_html(index=False, classes="clean-notification-table", escape=False)
@@ -356,14 +384,11 @@ with st.expander("🔒 Administrator History View (Live Database Sync)", expande
             st.image(history_canvas, use_container_width=False, caption="Live Cumulative Database History View")
         with hist_col2:
             try:
-                # Transformed historical dataframe to hide 'Serial' and display 'Comments'
                 df_view = pd.DataFrame(plant_historical_records)
                 
-                # Handle cases where the spreadsheet doesn't have a record yet safely
                 if "Comments" not in df_view.columns:
                     df_view["Comments"] = ""
                 
-                # Explicitly pull the target columns and rename neatly
                 df_view = df_view[["Label", "DateNoticed", "PrecipNoticed", "Comments"]]
                 df_view.columns = ["Leak Description", "Date Noticed", "Precipitation", "Comments / Notes"]
                 
