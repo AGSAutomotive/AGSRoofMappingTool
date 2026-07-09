@@ -27,7 +27,7 @@ with col_p1:
     plant = st.selectbox("Select Plant:", ['Cambridge - 07', 'Oshawa - 04', 'Sterling South', 'Windsor - 02'])
     plant_key = plant.replace(' ', '_').replace('-', '_')
     
-    # --- ADDED: Dynamic Size Toggle Placement ---
+    # Keeps the quick enlargement option check box
     enlarge_map = st.checkbox("🔍 Enlarge Map View (For Detailed Plotting)")
     
 with col_p2:
@@ -78,8 +78,23 @@ try:
     left_img = Image.open(left_path).convert("RGB")
     right_img = Image.open(right_path).convert("RGB")
     
-    # --- UPDATED: Configured dynamically based on checkbox state ---
-    DISPLAY_WIDTH = 950 if enlarge_map else 600
+    # --- ADDED: Granular Layout Width Slider Bar ---
+    # Sets default canvas scaling bounds depending on if the checkbox is checked or unchecked
+    min_w = 950 if enlarge_map else 600
+    max_w = 1800 if enlarge_map else 1200
+    start_w = 1200 if enlarge_map else 800
+    
+    st.write("")  # Tight layout padding buffer
+    map_scale_slider = st.slider(
+        "↔️ Adjust Image Display Width Scale (Pixels):", 
+        min_value=min_w, 
+        max_value=max_w, 
+        value=start_w, 
+        step=50,
+        key=f"slider_{plant_key}"
+    )
+    DISPLAY_WIDTH = map_scale_slider
+    # --------------------------------------------
     
     left_resized = left_img.resize((DISPLAY_WIDTH, int(left_img.height * (DISPLAY_WIDTH / left_img.width))))
     right_resized = right_img.resize((DISPLAY_WIDTH, int(right_img.height * (DISPLAY_WIDTH / right_img.width))))
@@ -121,33 +136,34 @@ for pt in st.session_state["new_pins_batch"]:
     draw_excel.rectangle((bbox_right[0]-4, bbox_right[1]-2, bbox_right[2]+4, bbox_right[3]+2), fill="#1A1A1A", outline="cyan", width=1)
     draw_excel.text(text_pos_right, custom_name, fill="cyan")
 
-# Display Side-by-Side Images
+# --- UPDATED: Vertically Stacked Canvas Layout View ---
 st.write("---")
-col1, col2 = st.columns(2)
-with col1:
-    st.subheader("🗺️ Floor Map")
-    click = streamlit_image_coordinates(left_display, key=f"click_{plant_key}")
-    if click and click != st.session_state.get(f"lclick_{plant_key}"):
-        st.session_state[f"lclick_{plant_key}"] = click
-        next_serial = len(st.session_state["new_pins_batch"]) + 1
-        
-        st.session_state["new_pins_batch"].append({
-            'id': str(time.time()).replace(".", ""), 
-            'serial': next_serial, 'x': click['x'], 'y': click['y'],
-            'name': f"Leak Point {next_serial}", 'start_date': datetime.date.today(),
-            'comments': ""
-        })
-        st.rerun()
-with col2:
-    st.subheader("🦅 Roof View")
-    st.image(right_display)
+
+st.subheader("🗺️ Floor Map")
+click = streamlit_image_coordinates(left_display, key=f"click_{plant_key}")
+if click and click != st.session_state.get(f"lclick_{plant_key}"):
+    st.session_state[f"lclick_{plant_key}"] = click
+    next_serial = len(st.session_state["new_pins_batch"]) + 1
+    
+    st.session_state["new_pins_batch"].append({
+        'id': str(time.time()).replace(".", ""), 
+        'serial': next_serial, 'x': click['x'], 'y': click['y'],
+        'name': f"Leak Point {next_serial}", 'start_date': datetime.date.today(),
+        'comments': ""
+    })
+    st.rerun()
+
+st.write("---")
+st.subheader("🦅 Roof View")
+st.image(right_display)
+# -----------------------------------------------------
 
 # --- Grid Form Layout Area ---
 st.write("---")
 st.subheader("📋 New Unreported Leaks")
 
 if not st.session_state["new_pins_batch"]:
-    st.info("💡No new leaks plotted yet for this plant. Click on the left image to plot new leaks.")
+    st.info("💡No new leaks plotted yet for this plant. Click on the floor map image above to plot new leaks.")
 else:
     st.info("💡**Click to rename or add details:** Customize the leak label, date, or add important comments below.")
     
@@ -212,162 +228,4 @@ if st.session_state["new_pins_batch"]:
     
     with btn_layout_col:
         if st.button("🚀 Report Leaks", type="primary", use_container_width=True, disabled=not is_email_valid):
-            with st.spinner("Generating consolidated maps and compiling summary table..."):
-                
-                final_merged_image = right_resized.convert("RGBA")
-                final_merged_image.paste(excel_overlay_canvas, (0, 0), excel_overlay_canvas)
-                final_merged_image = final_merged_image.convert("RGB")
-                
-                buffer = io.BytesIO()
-                final_merged_image.save(buffer, format="JPEG", quality=90)
-                base64_string = base64.b64encode(buffer.getvalue()).decode('utf-8')
-                
-                local_timestamp = datetime.datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d %H:%M:%S")
-                
-                grid_positions = {'Cambridge___07': "A2", 'Oshawa___04': "M2", 'Sterling_South': "AK2", 'Windsor___02': "Y2"}
-                target_cell = grid_positions.get(plant_key, "A2")
-                
-                # Package ALL itemized points together into a structured dynamic data array
-                leak_items_list = []
-                for pt in st.session_state["new_pins_batch"]:
-                    c_date = pt['start_date']
-                    leak_items_list.append({
-                        "Serial": int(pt['serial']),
-                        "Label": pt['name'],
-                        "DateNoticed": c_date.strftime("%Y-%m-%d"),
-                        "PrecipNoticed": get_real_weather_data(plant, c_date),
-                        "PrecipBefore": get_real_weather_data(plant, c_date - datetime.timedelta(days=1)),
-                        "CoordinateX": int(pt['x']),
-                        "CoordinateY": int(pt['y']),
-                        "Comments": pt.get('comments', "").strip()
-                    })
-                
-                # --- GENERATED EMAIL TABLE CONSTRUCT ENGINE ---
-                raw_df = pd.DataFrame(leak_items_list)
-                
-                # Drop structural tracking columns, keeping Comments visible
-                email_df = raw_df.drop(columns=["Serial", "CoordinateX", "CoordinateY"], errors="ignore")
-                
-                # Give columns clean professional formatting headers
-                email_df.columns = ["Leak Description", "Date Noticed", "Precipitation (Day)", "Precipitation (Before)", "Comments / Actions Needed"]
-                
-                html_table_body = email_df.to_html(index=False, classes="clean-notification-table", escape=False)
-                
-                styled_email_table = f"""
-                <style>
-                    .clean-notification-table {{
-                        border-collapse: collapse;
-                        width: 100%;
-                        font-family: Calibri, Arial, sans-serif;
-                        font-size: 14px;
-                        margin: 16px 0;
-                    }}
-                    .clean-notification-table th {{
-                        background-color: #003366;
-                        color: #ffffff;
-                        font-weight: bold;
-                        text-align: left;
-                        padding: 12px 24px;
-                        border: 1px solid #002244;
-                        min-width: 140px;
-                    }}
-                    .clean-notification-table td {{
-                        padding: 10px 24px;
-                        border: 1px solid #dddddd;
-                        text-align: left;
-                        vertical-align: middle;
-                    }}
-                    .clean-notification-table tr:nth-child(even) {{
-                        background-color: #f9f9f9;
-                    }}
-                </style>
-                {html_table_body}
-                """
-                
-                master_payload = {
-                    "Plant": plant,
-                    "Timestamp": local_timestamp,
-                    "ReporterEmail": user_email,
-                    "DashboardCell": target_cell,
-                    "Base64MapData": base64_string,
-                    "LeaksArray": leak_items_list,       
-                    "EmailTableHTML": styled_email_table 
-                }
-                
-                requests.post(POWER_AUTOMATE_URL, json=master_payload)
-                
-                st.session_state["new_pins_batch"] = []
-                st.success("🎉 All leaks successfully reported!")
-                time.sleep(1)
-                st.rerun()
-
-# ------------------------------------------------------------------
-# 🔒 DYNAMIC HISTORICAL MAP ENGINE (Renders at Very Bottom)
-# ------------------------------------------------------------------
-st.write("---")
-with st.expander("🔒 Administrator History View (Live Database Sync)", expanded=False):
-    st.subheader(f"📊 Historical Leak Map — {plant}")
-    
-    historical_records = []
-    try:
-        response = requests.get(f"{EXCEL_FETCH_URL}&cb={time.time()}", timeout=60)
-        if response.status_code == 200:
-            historical_records = response.json()
-            if not isinstance(historical_records, list):
-                historical_records = response.json().get("value", [])
-    except Exception as e:
-        st.error("⚠️ Failed to communicate with live Power Automate database retriever flow.")
-
-    plant_historical_records = []
-    for r in historical_records:
-        if str(r.get("Plant", "")).strip() == plant:
-            raw_date = r.get("DateNoticed", "")
-            try:
-                if str(raw_date).isdigit() or isinstance(raw_date, (int, float)):
-                    serial_num = int(float(raw_date))
-                    converted_dt = datetime.date(1899, 12, 30) + datetime.timedelta(days=serial_num)
-                    r["DateNoticed"] = converted_dt.strftime("%Y/%m/%d")
-            except Exception:
-                pass
-            plant_historical_records.append(r)
-
-    if not plant_historical_records:
-        st.info("🍃 The historical database is currently empty.")
-    else:
-        st.caption(f"Showing {len(plant_historical_records)} historical leak points.")
-        
-        history_canvas = right_resized.copy()
-        draw_history = ImageDraw.Draw(history_canvas)
-        
-        for record in plant_historical_records:
-            try:
-                hx = int(float(record["CoordinateX"]))
-                hy = int(float(record["CoordinateY"]))
-                h_label = str(record.get("Label", "Unlabeled Point"))
-                
-                draw_history.ellipse((hx-10, hy-10, hx+10, hy+10), outline="yellow", width=2)
-                draw_history.ellipse((hx-3, hy-3, hx+3, hy+3), fill="orange")
-                
-                h_text_pos = (hx + 14, hy - 6)
-                h_bbox = draw_history.textbbox(h_text_pos, h_label)
-                draw_history.rectangle((h_bbox[0]-3, h_bbox[1]-1, h_bbox[2]+3, h_bbox[3]+1), fill="#262730")
-                draw_history.text(h_text_pos, h_label, fill="yellow")
-            except:
-                pass 
-            
-        hist_col1, hist_col2 = st.columns([6.0, 4.0])
-        with hist_col1:
-            st.image(history_canvas, use_container_width=False, caption="Live Cumulative Database History View")
-        with hist_col2:
-            try:
-                df_view = pd.DataFrame(plant_historical_records)
-                
-                if "Comments" not in df_view.columns:
-                    df_view["Comments"] = ""
-                
-                df_view = df_view[["Label", "DateNoticed", "PrecipNoticed", "Comments"]]
-                df_view.columns = ["Leak Description", "Date Noticed", "Precipitation", "Comments / Notes"]
-                
-                st.dataframe(df_view, use_container_width=True, hide_index=True)
-            except Exception as table_err:
-                st.caption("Unable to format history grid columns. Raw attributes might be initializing.")
+            with st
