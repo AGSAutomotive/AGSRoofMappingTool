@@ -356,16 +356,20 @@ with st.expander("🔒 Administrator History View (Live Database Sync)", expande
             st.image(history_canvas, use_container_width=False, caption="Live Cumulative Database History View")
         with hist_col2:
             try:
-                # Transformed historical dataframe to hide 'Serial' and display 'Comments'
                 df_view = pd.DataFrame(plant_historical_records)
                 
-                # Handle cases where the spreadsheet doesn't have a record yet safely
                 if "Comments" not in df_view.columns:
                     df_view["Comments"] = ""
+                    
+                # Ensure ReporterEmail exists in the dataset to avoid KeyErrors
+                if "ReporterEmail" not in df_view.columns:
+                    df_view["ReporterEmail"] = "N/A"
                 
-                # Explicitly pull the target columns and rename neatly
-                df_view = df_view[["Label", "DateNoticed", "PrecipNoticed", "Comments"]]
-                df_view.columns = ["Leak Description", "Date Noticed", "Precipitation", "Comments / Notes"]
+                # UPDATED: Added 'ReporterEmail' to the visible selection list
+                df_view = df_view[["Label", "ReporterEmail", "DateNoticed", "PrecipNoticed", "Comments"]]
+                
+                # Clean up the headers for the plant operators/admins
+                df_view.columns = ["Leak Description", "Submitted By", "Date Noticed", "Precipitation", "Comments / Notes"]
                 
                 st.dataframe(df_view, use_container_width=True, hide_index=True)
             except Exception as table_err:
