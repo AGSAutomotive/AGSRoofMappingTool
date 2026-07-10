@@ -24,7 +24,6 @@ st.info("💡Select plant from the dropdown and enter your AGS email. Then click
 # 1. User & Plant Info Inputs
 col_p1, col_p2 = st.columns([4.0, 6.0])
 with col_p1:
-    # Added 'Sterling South' to the selection menu
     plant = st.selectbox("Select Plant:", ['Cambridge - 07', 'Oshawa - 04', 'Sterling South', 'Windsor - 02'])
     plant_key = plant.replace(' ', '_').replace('-', '_')
 with col_p2:
@@ -39,7 +38,6 @@ if "new_pins_batch" not in st.session_state or st.session_state.get("current_act
 # Weather Engine Functionality
 @st.cache_data(ttl=3600)
 def get_real_weather_data(plant_name, target_date):
-    # Added exact coordinate mappings for Sterling South (42.542228, -83.041669)
     coordinates = {
         'Cambridge - 07': {"lat": 43.403449, "lon": -80.322832},
         'Oshawa - 04': {"lat": 43.876437, "lon": -78.848991},
@@ -76,7 +74,6 @@ try:
     left_img = Image.open(left_path).convert("RGB")
     right_img = Image.open(right_path).convert("RGB")
     
-    # CHANGED: Blow up maps to 1200px to expand fully into wide vertical screen spaces
     DISPLAY_WIDTH = 1200
     left_resized = left_img.resize((DISPLAY_WIDTH, int(left_img.height * (DISPLAY_WIDTH / left_img.width))))
     right_resized = right_img.resize((DISPLAY_WIDTH, int(right_img.height * (DISPLAY_WIDTH / right_img.width))))
@@ -97,14 +94,14 @@ draw_excel = ImageDraw.Draw(excel_overlay_canvas)
 for pt in st.session_state["new_pins_batch"]:
     x, y, custom_name = pt['x'], pt['y'], pt['name']
     
-    # Draw on local App CAD View (Enlarged for 1200px visibility)
-    draw_left.ellipse((x-12, y-12, x+12, y+12), fill="red")
-    text_pos_left = (x + 18, y - 8)
+    # UPDATED: Reverted pin radius back to original (8px), but kept label offset and padding clean
+    draw_left.ellipse((x-8, y-8, x+8, y+8), fill="red")
+    text_pos_left = (x + 16, y - 8)
     bbox_left = draw_left.textbbox(text_pos_left, custom_name)
     draw_left.rectangle((bbox_left[0]-6, bbox_left[1]-4, bbox_left[2]+6, bbox_left[3]+4), fill="white", outline="red", width=2)
     draw_left.text(text_pos_left, custom_name, fill="red")
     
-    # Draw on local App Satellite Roof View (Enlarged for 1200px visibility)
+    # ROOF VIEW MAP: Left alone as per your instruction (original proportions)
     draw_right.ellipse((x-24, y-24, x+24, y+24), outline="cyan", width=4)
     draw_right.ellipse((x-6, y-6, x+6, y+6), fill="red")
     text_pos_right = (x + 30, y - 10)
@@ -118,9 +115,8 @@ for pt in st.session_state["new_pins_batch"]:
     draw_excel.rectangle((bbox_right[0]-6, bbox_right[1]-4, bbox_right[2]+6, bbox_right[3]+4), fill="#1A1A1A", outline="cyan", width=2)
     draw_excel.text(text_pos_right, custom_name, fill="cyan")
 
-# CHANGED: Reorganized interface from side-by-side columns into a stacked vertical workspace
 st.write("---")
-st.subheader("🗺️ Floor Map")
+st.subheader("🗺️ 1. Floor Map (Click to Plot Leak)")
 click = streamlit_image_coordinates(left_display, key=f"click_{plant_key}")
 
 if click and click != st.session_state.get(f"lclick_{plant_key}"):
@@ -136,7 +132,7 @@ if click and click != st.session_state.get(f"lclick_{plant_key}"):
     st.rerun()
 
 st.write("---")
-st.subheader("🦅 Roof View ")
+st.subheader("🦅 2. Satellite Roof View (Corresponding Projections)")
 st.image(right_display)
 
 # --- Grid Form Layout Area ---
@@ -148,7 +144,6 @@ if not st.session_state["new_pins_batch"]:
 else:
     st.info("💡**Click to rename or add details:** Customize the leak label, date, or add important comments below.")
     
-    # Adjusted column ratios to comfortably fit a Comments text box
     grid_header1, grid_header2, grid_header3, grid_header4, grid_header5, grid_header6, grid_header7 = st.columns([0.8, 1.8, 1.4, 1.8, 1.8, 2.2, 1.2])
     with grid_header3: st.markdown("**📅 Date Noticed**")
     with grid_header4: st.markdown("**🌦️ Precipitation (Day Noticed)**")
@@ -175,7 +170,6 @@ else:
         with c_w1: st.markdown(f"**{get_real_weather_data(plant, chosen_date)}**")
         with c_w2: st.markdown(f"**{get_real_weather_data(plant, chosen_date - datetime.timedelta(days=1))}**")
         
-        # Live Comments Input Box
         with c_cmt:
             new_comment = st.text_input("Comments:", value=point['comments'], placeholder="e.g., Near stamping press, pooling", key=f"cmt_{point['id']}", label_visibility="collapsed")
             if new_comment != point['comments']:
@@ -221,16 +215,13 @@ if st.session_state["new_pins_batch"]:
                 
                 local_timestamp = datetime.datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d %H:%M:%S")
                 
-                # Added dynamic target column cell placement for Sterling South ("AK2")
                 grid_positions = {'Cambridge___07': "A2", 'Oshawa___04': "M2", 'Sterling_South': "AK2", 'Windsor___02': "Y2"}
                 target_cell = grid_positions.get(plant_key, "A2")
                 
-                # Package ALL itemized points together into a structured dynamic data array
                 leak_items_list = []
                 for pt in st.session_state["new_pins_batch"]:
                     c_date = pt['start_date']
                     
-                    # CHANGED: Normalize the local 1200px coordinates down to 600px limits to keep the backend database fully compatible
                     stored_x = int(pt['x'] * (600 / DISPLAY_WIDTH))
                     stored_y = int(pt['y'] * (int(left_img.height * (600 / left_img.width)) / int(left_img.height * (DISPLAY_WIDTH / left_img.width))))
                     
@@ -245,13 +236,8 @@ if st.session_state["new_pins_batch"]:
                         "Comments": pt.get('comments', "").strip()
                     })
                 
-                # --- GENERATED EMAIL TABLE CONSTRUCT ENGINE ---
                 raw_df = pd.DataFrame(leak_items_list)
-                
-                # Drop structural tracking columns, keeping Comments visible
                 email_df = raw_df.drop(columns=["Serial", "CoordinateX", "CoordinateY"], errors="ignore")
-                
-                # Give columns clean professional formatting headers
                 email_df.columns = ["Leak Description", "Date Noticed", "Precipitation (Day)", "Precipitation (Before)", "Comments / Actions Needed"]
                 
                 html_table_body = email_df.to_html(index=False, classes="clean-notification-table", escape=False)
@@ -308,8 +294,8 @@ if st.session_state["new_pins_batch"]:
 # 🔒 DYNAMIC HISTORICAL MAP ENGINE (Renders at Very Bottom)
 # ------------------------------------------------------------------
 st.write("---")
-with st.expander("🔒 Leak History (Live Database Sync)", expanded=False):
-    st.subheader(f"📊 Historical Leak Records — {plant}")
+with st.expander("🔒 Administrator History View (Live Database Sync)", expanded=False):
+    st.subheader(f"📊 Historical Leak Map — {plant}")
     
     historical_records = []
     try:
@@ -344,18 +330,17 @@ with st.expander("🔒 Leak History (Live Database Sync)", expanded=False):
         
         for record in plant_historical_records:
             try:
-                # CHANGED: Scaled baseline historical 600px coordinates up proportionally to render perfectly over the new 1200px admin display canvas
                 hx = int(float(record["CoordinateX"]) * (DISPLAY_WIDTH / 600))
                 hy = int(float(record["CoordinateY"]) * (int(right_img.height * (DISPLAY_WIDTH / right_img.width)) / int(right_img.height * (600 / right_img.width))))
                 h_label = str(record.get("Label", "Unlabeled Point"))
                 
-                # UPDATED: Scaled up font padding, drawing radiuses, and borders to look large and high contrast at 1200px wide
+                # UPDATED: Enforced large high-visibility parameters specifically for the historical view map
                 draw_history.ellipse((hx-20, hy-20, hx+20, hy+20), outline="yellow", width=4)
                 draw_history.ellipse((hx-6, hy-6, hx+6, hy+6), fill="orange")
                 
-                h_text_pos = (hx + 26, hy - 10)
+                h_text_pos = (hx + 28, hy - 10)
                 h_bbox = draw_history.textbbox(h_text_pos, h_label)
-                draw_history.rectangle((h_bbox[0]-6, h_bbox[1]-4, h_bbox[2]+6, h_bbox[3]+4), fill="#262730")
+                draw_history.rectangle((h_bbox[0]-8, h_bbox[1]-4, h_bbox[2]+8, h_bbox[3]+4), fill="#262730", outline="yellow", width=1)
                 draw_history.text(h_text_pos, h_label, fill="yellow")
             except:
                 pass 
@@ -370,14 +355,10 @@ with st.expander("🔒 Leak History (Live Database Sync)", expanded=False):
                 if "Comments" not in df_view.columns:
                     df_view["Comments"] = ""
                     
-                # Ensure ReporterEmail exists in the dataset to avoid KeyErrors
                 if "ReporterEmail" not in df_view.columns:
                     df_view["ReporterEmail"] = "N/A"
                 
-                # UPDATED: Added 'ReporterEmail' to the visible selection list
                 df_view = df_view[["Label", "DateNoticed", "ReporterEmail", "PrecipNoticed", "Comments"]]
-                
-                # Clean up the headers for the plant operators/admins
                 df_view.columns = ["Leak Description", "Date Noticed", "Submitted By", "Precipitation", "Comments / Notes"]
                 
                 st.dataframe(df_view, use_container_width=True, hide_index=True)
