@@ -366,7 +366,7 @@ with st.expander("🔒 Administrator History View (Live Database Sync)", expande
                     df_view["ReporterEmail"] = "N/A"
                 
                 # UPDATED: Added 'ReporterEmail' to the visible selection list
-                df_view = df_view[["Label", "ReporterEmail", "DateNoticed", "PrecipNoticed", "Comments"]]
+                df_view = df_view[["Label", "DateNoticed", "ReporterEmail", "PrecipNoticed", "Comments"]]
                 
                 # Clean up the headers for the plant operators/admins
                 df_view.columns = ["Leak Description", "Date Noticed", "Submitted By", "Precipitation", "Comments / Notes"]
