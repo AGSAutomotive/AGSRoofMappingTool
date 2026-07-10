@@ -81,10 +81,10 @@ except Exception as e:
     st.error(f"⚠️ Base asset missing inside data/ directory: {e}")
     st.stop()
 
-# UPDATED: Re-balanced font engine constraints down to happier medium baseline sizes
+# Font Configuration Setup
 try:
-    font_floor = ImageFont.load_default(size=16)     # Dropped from 22
-    font_history = ImageFont.load_default(size=24)   # Dropped from 32
+    font_floor = ImageFont.load_default(size=16)     # Target size for both Floor and Roof layouts
+    font_history = ImageFont.load_default(size=24)   
 except Exception:
     font_floor = ImageFont.load_default()
     font_history = ImageFont.load_default()
@@ -100,25 +100,26 @@ draw_excel = ImageDraw.Draw(excel_overlay_canvas)
 for pt in st.session_state["new_pins_batch"]:
     x, y, custom_name = pt['x'], pt['y'], pt['name']
     
-    # 🗺️ FLOOR MAP: 8px dot retained, label box bounds tight and crisp
+    # 🗺️ FLOOR MAP VIEW (Size 16 Text Block)
     draw_left.ellipse((x-8, y-8, x+8, y+8), fill="red")
     text_pos_left = (x + 14, y - 10)
     bbox_left = draw_left.textbbox(text_pos_left, custom_name, font=font_floor)
     draw_left.rectangle((bbox_left[0]-5, bbox_left[1]-3, bbox_left[2]+5, bbox_left[3]+3), fill="white", outline="red", width=2)
     draw_left.text(text_pos_left, custom_name, fill="red", font=font_floor)
     
-    # 🦅 ROOF VIEW MAP: Unaltered
+    # 🦅 UPDATED: ROOF VIEW MAP (Now matched precisely to size 16 text constraints)
     draw_right.ellipse((x-24, y-24, x+24, y+24), outline="cyan", width=4)
     draw_right.ellipse((x-6, y-6, x+6, y+6), fill="red")
     text_pos_right = (x + 30, y - 10)
-    bbox_right = draw_right.textbbox(text_pos_right, custom_name)
-    draw_right.rectangle((bbox_right[0]-6, bbox_right[1]-4, bbox_right[2]+6, bbox_right[3]+4), fill="#1A1A1A", outline="cyan", width=2)
-    draw_right.text(text_pos_right, custom_name, fill="cyan")
+    bbox_right = draw_right.textbbox(text_pos_right, custom_name, font=font_floor)
+    draw_right.rectangle((bbox_right[0]-5, bbox_right[1]-3, bbox_right[2]+5, bbox_right[3]+3), fill="#1A1A1A", outline="cyan", width=2)
+    draw_right.text(text_pos_right, custom_name, fill="cyan", font=font_floor)
 
+    # 🔗 UPDATED: Transparent Database Overlay (Keeps backend maps matching layout changes)
     draw_excel.ellipse((x-24, y-24, x+24, y+24), outline="cyan", width=4)
     draw_excel.ellipse((x-6, y-6, x+6, y+6), fill="red")
-    draw_excel.rectangle((bbox_right[0]-6, bbox_right[1]-4, bbox_right[2]+6, bbox_right[3]+4), fill="#1A1A1A", outline="cyan", width=2)
-    draw_excel.text(text_pos_right, custom_name, fill="cyan")
+    draw_excel.rectangle((bbox_right[0]-5, bbox_right[1]-3, bbox_right[2]+5, bbox_right[3]+3), fill="#1A1A1A", outline="cyan", width=2)
+    draw_excel.text(text_pos_right, custom_name, fill="cyan", font=font_floor)
 
 st.write("---")
 st.subheader("🗺️ 1. Floor Map (Click to Plot Leak)")
@@ -339,7 +340,6 @@ with st.expander("🔒 Administrator History View (Live Database Sync)", expande
                 hy = int(float(record["CoordinateY"]) * (int(right_img.height * (DISPLAY_WIDTH / right_img.width)) / int(right_img.height * (600 / right_img.width))))
                 h_label = str(record.get("Label", "Unlabeled Point"))
                 
-                # 🔒 HISTORICAL MAP: Scaled slightly tighter down to size=24 font parameters 
                 draw_history.ellipse((hx-20, hy-20, hx+20, hy+20), outline="yellow", width=4)
                 draw_history.ellipse((hx-6, hy-6, hx+6, hy+6), fill="orange")
                 
