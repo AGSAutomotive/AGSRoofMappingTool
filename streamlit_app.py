@@ -97,30 +97,30 @@ draw_excel = ImageDraw.Draw(excel_overlay_canvas)
 for pt in st.session_state["new_pins_batch"]:
     x, y, custom_name = pt['x'], pt['y'], pt['name']
     
-    # Draw on local App CAD View (Proportional size tweaks for high resolution visibility)
-    draw_left.ellipse((x-8, y-8, x+8, y+8), fill="red")
-    text_pos_left = (x + 12, y - 6)
+    # Draw on local App CAD View (Enlarged for 1200px visibility)
+    draw_left.ellipse((x-12, y-12, x+12, y+12), fill="red")
+    text_pos_left = (x + 18, y - 8)
     bbox_left = draw_left.textbbox(text_pos_left, custom_name)
-    draw_left.rectangle((bbox_left[0]-4, bbox_left[1]-2, bbox_left[2]+4, bbox_left[3]+2), fill="white", outline="red", width=1)
+    draw_left.rectangle((bbox_left[0]-6, bbox_left[1]-4, bbox_left[2]+6, bbox_left[3]+4), fill="white", outline="red", width=2)
     draw_left.text(text_pos_left, custom_name, fill="red")
     
-    # Draw on local App Satellite Roof View (1:1 layout match)
-    draw_right.ellipse((x-16, y-16, x+16, y+16), outline="cyan", width=3)
-    draw_right.ellipse((x-4, y-4, x+4, y+4), fill="red")
-    text_pos_right = (x + 20, y - 8)
+    # Draw on local App Satellite Roof View (Enlarged for 1200px visibility)
+    draw_right.ellipse((x-24, y-24, x+24, y+24), outline="cyan", width=4)
+    draw_right.ellipse((x-6, y-6, x+6, y+6), fill="red")
+    text_pos_right = (x + 30, y - 10)
     bbox_right = draw_right.textbbox(text_pos_right, custom_name)
-    draw_right.rectangle((bbox_right[0]-4, bbox_right[1]-2, bbox_right[2]+4, bbox_right[3]+2), fill="#1A1A1A", outline="cyan", width=1)
+    draw_right.rectangle((bbox_right[0]-6, bbox_right[1]-4, bbox_right[2]+6, bbox_right[3]+4), fill="#1A1A1A", outline="cyan", width=2)
     draw_right.text(text_pos_right, custom_name, fill="cyan")
 
     # Draw onto transparent overlay layer
-    draw_excel.ellipse((x-16, y-16, x+16, y+16), outline="cyan", width=3)
-    draw_excel.ellipse((x-4, y-4, x+4, y+4), fill="red")
-    draw_excel.rectangle((bbox_right[0]-4, bbox_right[1]-2, bbox_right[2]+4, bbox_right[3]+2), fill="#1A1A1A", outline="cyan", width=1)
+    draw_excel.ellipse((x-24, y-24, x+24, y+24), outline="cyan", width=4)
+    draw_excel.ellipse((x-6, y-6, x+6, y+6), fill="red")
+    draw_excel.rectangle((bbox_right[0]-6, bbox_right[1]-4, bbox_right[2]+6, bbox_right[3]+4), fill="#1A1A1A", outline="cyan", width=2)
     draw_excel.text(text_pos_right, custom_name, fill="cyan")
 
 # CHANGED: Reorganized interface from side-by-side columns into a stacked vertical workspace
 st.write("---")
-st.subheader("🗺️ Floor Map View")
+st.subheader("🗺️ Floor Map")
 click = streamlit_image_coordinates(left_display, key=f"click_{plant_key}")
 
 if click and click != st.session_state.get(f"lclick_{plant_key}"):
@@ -136,7 +136,7 @@ if click and click != st.session_state.get(f"lclick_{plant_key}"):
     st.rerun()
 
 st.write("---")
-st.subheader("🦅 Roof View")
+st.subheader("🦅 Roof View ")
 st.image(right_display)
 
 # --- Grid Form Layout Area ---
@@ -349,12 +349,13 @@ with st.expander("🔒 Leak History (Live Database Sync)", expanded=False):
                 hy = int(float(record["CoordinateY"]) * (int(right_img.height * (DISPLAY_WIDTH / right_img.width)) / int(right_img.height * (600 / right_img.width))))
                 h_label = str(record.get("Label", "Unlabeled Point"))
                 
-                draw_history.ellipse((hx-14, hy-14, hx+14, hy+14), outline="yellow", width=2)
-                draw_history.ellipse((hx-4, hy-4, hx+4, hy+4), fill="orange")
+                # UPDATED: Scaled up font padding, drawing radiuses, and borders to look large and high contrast at 1200px wide
+                draw_history.ellipse((hx-20, hy-20, hx+20, hy+20), outline="yellow", width=4)
+                draw_history.ellipse((hx-6, hy-6, hx+6, hy+6), fill="orange")
                 
-                h_text_pos = (hx + 18, hy - 6)
+                h_text_pos = (hx + 26, hy - 10)
                 h_bbox = draw_history.textbbox(h_text_pos, h_label)
-                draw_history.rectangle((h_bbox[0]-3, h_bbox[1]-1, h_bbox[2]+3, h_bbox[3]+1), fill="#262730")
+                draw_history.rectangle((h_bbox[0]-6, h_bbox[1]-4, h_bbox[2]+6, h_bbox[3]+4), fill="#262730")
                 draw_history.text(h_text_pos, h_label, fill="yellow")
             except:
                 pass 
