@@ -120,7 +120,7 @@ for pt in st.session_state["new_pins_batch"]:
 
 # CHANGED: Reorganized interface from side-by-side columns into a stacked vertical workspace
 st.write("---")
-st.subheader("🗺️ 1. Floor Map (Click to Plot Leak)")
+st.subheader("🗺️ Floor Map View")
 click = streamlit_image_coordinates(left_display, key=f"click_{plant_key}")
 
 if click and click != st.session_state.get(f"lclick_{plant_key}"):
@@ -136,7 +136,7 @@ if click and click != st.session_state.get(f"lclick_{plant_key}"):
     st.rerun()
 
 st.write("---")
-st.subheader("🦅 2. Satellite Roof View (Corresponding Projections)")
+st.subheader("🦅 Roof View")
 st.image(right_display)
 
 # --- Grid Form Layout Area ---
@@ -308,8 +308,8 @@ if st.session_state["new_pins_batch"]:
 # 🔒 DYNAMIC HISTORICAL MAP ENGINE (Renders at Very Bottom)
 # ------------------------------------------------------------------
 st.write("---")
-with st.expander("🔒 Administrator History View (Live Database Sync)", expanded=False):
-    st.subheader(f"📊 Historical Leak Map — {plant}")
+with st.expander("🔒 Leak History (Live Database Sync)", expanded=False):
+    st.subheader(f"📊 Historical Leak Records — {plant}")
     
     historical_records = []
     try:
