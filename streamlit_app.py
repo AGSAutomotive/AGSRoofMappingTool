@@ -369,7 +369,7 @@ with st.expander("🔒 Administrator History View (Live Database Sync)", expande
                 df_view = df_view[["Label", "ReporterEmail", "DateNoticed", "PrecipNoticed", "Comments"]]
                 
                 # Clean up the headers for the plant operators/admins
-                df_view.columns = ["Leak Description", "Submitted By", "Date Noticed", "Precipitation", "Comments / Notes"]
+                df_view.columns = ["Leak Description", "Date Noticed", "Submitted By", "Precipitation", "Comments / Notes"]
                 
                 st.dataframe(df_view, use_container_width=True, hide_index=True)
             except Exception as table_err:
