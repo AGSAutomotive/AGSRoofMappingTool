@@ -75,7 +75,9 @@ try:
 
     left_img = Image.open(left_path).convert("RGB")
     right_img = Image.open(right_path).convert("RGB")
-    DISPLAY_WIDTH = 600
+    
+    # CHANGED: Blow up maps to 1200px to expand fully into wide vertical screen spaces
+    DISPLAY_WIDTH = 1200
     left_resized = left_img.resize((DISPLAY_WIDTH, int(left_img.height * (DISPLAY_WIDTH / left_img.width))))
     right_resized = right_img.resize((DISPLAY_WIDTH, int(right_img.height * (DISPLAY_WIDTH / right_img.width))))
 except Exception as e:
@@ -95,54 +97,54 @@ draw_excel = ImageDraw.Draw(excel_overlay_canvas)
 for pt in st.session_state["new_pins_batch"]:
     x, y, custom_name = pt['x'], pt['y'], pt['name']
     
-    # Draw on local App CAD View
-    draw_left.ellipse((x-6, y-6, x+6, y+6), fill="red")
-    text_pos_left = (x + 10, y - 6)
+    # Draw on local App CAD View (Proportional size tweaks for high resolution visibility)
+    draw_left.ellipse((x-8, y-8, x+8, y+8), fill="red")
+    text_pos_left = (x + 12, y - 6)
     bbox_left = draw_left.textbbox(text_pos_left, custom_name)
     draw_left.rectangle((bbox_left[0]-4, bbox_left[1]-2, bbox_left[2]+4, bbox_left[3]+2), fill="white", outline="red", width=1)
     draw_left.text(text_pos_left, custom_name, fill="red")
     
-    # Draw on local App Satellite Roof View
-    draw_right.ellipse((x-12, y-12, x+12, y+12), outline="cyan", width=3)
-    draw_right.ellipse((x-3, y-3, x+3, y+3), fill="red")
-    text_pos_right = (x + 16, y - 8)
+    # Draw on local App Satellite Roof View (1:1 layout match)
+    draw_right.ellipse((x-16, y-16, x+16, y+16), outline="cyan", width=3)
+    draw_right.ellipse((x-4, y-4, x+4, y+4), fill="red")
+    text_pos_right = (x + 20, y - 8)
     bbox_right = draw_right.textbbox(text_pos_right, custom_name)
     draw_right.rectangle((bbox_right[0]-4, bbox_right[1]-2, bbox_right[2]+4, bbox_right[3]+2), fill="#1A1A1A", outline="cyan", width=1)
     draw_right.text(text_pos_right, custom_name, fill="cyan")
 
     # Draw onto transparent overlay layer
-    draw_excel.ellipse((x-12, y-12, x+12, y+12), outline="cyan", width=3)
-    draw_excel.ellipse((x-3, y-3, x+3, y+3), fill="red")
+    draw_excel.ellipse((x-16, y-16, x+16, y+16), outline="cyan", width=3)
+    draw_excel.ellipse((x-4, y-4, x+4, y+4), fill="red")
     draw_excel.rectangle((bbox_right[0]-4, bbox_right[1]-2, bbox_right[2]+4, bbox_right[3]+2), fill="#1A1A1A", outline="cyan", width=1)
     draw_excel.text(text_pos_right, custom_name, fill="cyan")
 
-# Display Side-by-Side Images
+# CHANGED: Reorganized interface from side-by-side columns into a stacked vertical workspace
 st.write("---")
-col1, col2 = st.columns(2)
-with col1:
-    st.subheader("🗺️ Floor Map")
-    click = streamlit_image_coordinates(left_display, key=f"click_{plant_key}")
-    if click and click != st.session_state.get(f"lclick_{plant_key}"):
-        st.session_state[f"lclick_{plant_key}"] = click
-        next_serial = len(st.session_state["new_pins_batch"]) + 1
-        
-        st.session_state["new_pins_batch"].append({
-            'id': str(time.time()).replace(".", ""), 
-            'serial': next_serial, 'x': click['x'], 'y': click['y'],
-            'name': f"Leak Point {next_serial}", 'start_date': datetime.date.today(),
-            'comments': ""
-        })
-        st.rerun()
-with col2:
-    st.subheader("🦅 Roof View")
-    st.image(right_display)
+st.subheader("🗺️ 1. Floor Map (Click to Plot Leak)")
+click = streamlit_image_coordinates(left_display, key=f"click_{plant_key}")
+
+if click and click != st.session_state.get(f"lclick_{plant_key}"):
+    st.session_state[f"lclick_{plant_key}"] = click
+    next_serial = len(st.session_state["new_pins_batch"]) + 1
+    
+    st.session_state["new_pins_batch"].append({
+        'id': str(time.time()).replace(".", ""), 
+        'serial': next_serial, 'x': click['x'], 'y': click['y'],
+        'name': f"Leak Point {next_serial}", 'start_date': datetime.date.today(),
+        'comments': ""
+    })
+    st.rerun()
+
+st.write("---")
+st.subheader("🦅 2. Satellite Roof View (Corresponding Projections)")
+st.image(right_display)
 
 # --- Grid Form Layout Area ---
 st.write("---")
 st.subheader("📋 New Unreported Leaks")
 
 if not st.session_state["new_pins_batch"]:
-    st.info("💡No new leaks plotted yet for this plant. Click on the left image to plot new leaks.")
+    st.info("💡No new leaks plotted yet for this plant. Click on the floor map above to plot new leaks.")
 else:
     st.info("💡**Click to rename or add details:** Customize the leak label, date, or add important comments below.")
     
@@ -227,14 +229,19 @@ if st.session_state["new_pins_batch"]:
                 leak_items_list = []
                 for pt in st.session_state["new_pins_batch"]:
                     c_date = pt['start_date']
+                    
+                    # CHANGED: Normalize the local 1200px coordinates down to 600px limits to keep the backend database fully compatible
+                    stored_x = int(pt['x'] * (600 / DISPLAY_WIDTH))
+                    stored_y = int(pt['y'] * (int(left_img.height * (600 / left_img.width)) / int(left_img.height * (DISPLAY_WIDTH / left_img.width))))
+                    
                     leak_items_list.append({
                         "Serial": int(pt['serial']),
                         "Label": pt['name'],
                         "DateNoticed": c_date.strftime("%Y-%m-%d"),
                         "PrecipNoticed": get_real_weather_data(plant, c_date),
                         "PrecipBefore": get_real_weather_data(plant, c_date - datetime.timedelta(days=1)),
-                        "CoordinateX": int(pt['x']),
-                        "CoordinateY": int(pt['y']),
+                        "CoordinateX": stored_x,
+                        "CoordinateY": stored_y,
                         "Comments": pt.get('comments', "").strip()
                     })
                 
@@ -337,14 +344,15 @@ with st.expander("🔒 Administrator History View (Live Database Sync)", expande
         
         for record in plant_historical_records:
             try:
-                hx = int(float(record["CoordinateX"]))
-                hy = int(float(record["CoordinateY"]))
+                # CHANGED: Scaled baseline historical 600px coordinates up proportionally to render perfectly over the new 1200px admin display canvas
+                hx = int(float(record["CoordinateX"]) * (DISPLAY_WIDTH / 600))
+                hy = int(float(record["CoordinateY"]) * (int(right_img.height * (DISPLAY_WIDTH / right_img.width)) / int(right_img.height * (600 / right_img.width))))
                 h_label = str(record.get("Label", "Unlabeled Point"))
                 
-                draw_history.ellipse((hx-10, hy-10, hx+10, hy+10), outline="yellow", width=2)
-                draw_history.ellipse((hx-3, hy-3, hx+3, hy+3), fill="orange")
+                draw_history.ellipse((hx-14, hy-14, hx+14, hy+14), outline="yellow", width=2)
+                draw_history.ellipse((hx-4, hy-4, hx+4, hy+4), fill="orange")
                 
-                h_text_pos = (hx + 14, hy - 6)
+                h_text_pos = (hx + 18, hy - 6)
                 h_bbox = draw_history.textbbox(h_text_pos, h_label)
                 draw_history.rectangle((h_bbox[0]-3, h_bbox[1]-1, h_bbox[2]+3, h_bbox[3]+1), fill="#262730")
                 draw_history.text(h_text_pos, h_label, fill="yellow")
