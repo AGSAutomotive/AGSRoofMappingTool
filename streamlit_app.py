@@ -1,6 +1,6 @@
 import streamlit as st
 from streamlit_image_coordinates import streamlit_image_coordinates
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFont  # Added ImageFont to handle real text scaling
 import time
 import io
 import datetime
@@ -81,6 +81,15 @@ except Exception as e:
     st.error(f"⚠️ Base asset missing inside data/ directory: {e}")
     st.stop()
 
+# Dynamic Font Allocation Engine to prevent un-scalable tiny default text blocks
+try:
+    font_floor = ImageFont.load_default(size=22)
+    font_history = ImageFont.load_default(size=32)  # Noticeably large for high-res admin readability
+except Exception:
+    # Fallback to base configuration if container environment requires raw defaults
+    font_floor = ImageFont.load_default()
+    font_history = ImageFont.load_default()
+
 left_display = left_resized.copy()
 right_display = right_resized.copy()
 draw_left = ImageDraw.Draw(left_display)
@@ -94,14 +103,14 @@ draw_excel = ImageDraw.Draw(excel_overlay_canvas)
 for pt in st.session_state["new_pins_batch"]:
     x, y, custom_name = pt['x'], pt['y'], pt['name']
     
-    # UPDATED: Reverted pin radius back to original (8px), but kept label offset and padding clean
+    # 🗺️ FLOOR MAP: Dot reverted to original tight 8px size, text elements expanded cleanly
     draw_left.ellipse((x-8, y-8, x+8, y+8), fill="red")
-    text_pos_left = (x + 16, y - 8)
-    bbox_left = draw_left.textbbox(text_pos_left, custom_name)
-    draw_left.rectangle((bbox_left[0]-6, bbox_left[1]-4, bbox_left[2]+6, bbox_left[3]+4), fill="white", outline="red", width=2)
-    draw_left.text(text_pos_left, custom_name, fill="red")
+    text_pos_left = (x + 18, y - 14)
+    bbox_left = draw_left.textbbox(text_pos_left, custom_name, font=font_floor)
+    draw_left.rectangle((bbox_left[0]-8, bbox_left[1]-4, bbox_left[2]+8, bbox_left[3]+4), fill="white", outline="red", width=2)
+    draw_left.text(text_pos_left, custom_name, fill="red", font=font_floor)
     
-    # ROOF VIEW MAP: Left alone as per your instruction (original proportions)
+    # 🦅 ROOF VIEW MAP: Kept layout values completely intact as requested
     draw_right.ellipse((x-24, y-24, x+24, y+24), outline="cyan", width=4)
     draw_right.ellipse((x-6, y-6, x+6, y+6), fill="red")
     text_pos_right = (x + 30, y - 10)
@@ -334,14 +343,14 @@ with st.expander("🔒 Administrator History View (Live Database Sync)", expande
                 hy = int(float(record["CoordinateY"]) * (int(right_img.height * (DISPLAY_WIDTH / right_img.width)) / int(right_img.height * (600 / right_img.width))))
                 h_label = str(record.get("Label", "Unlabeled Point"))
                 
-                # UPDATED: Enforced large high-visibility parameters specifically for the historical view map
+                # 🔒 HISTORICAL MAP: Keeping the larger high-visibility dots, now paired with actual large-scale text strings
                 draw_history.ellipse((hx-20, hy-20, hx+20, hy+20), outline="yellow", width=4)
                 draw_history.ellipse((hx-6, hy-6, hx+6, hy+6), fill="orange")
                 
-                h_text_pos = (hx + 28, hy - 10)
-                h_bbox = draw_history.textbbox(h_text_pos, h_label)
-                draw_history.rectangle((h_bbox[0]-8, h_bbox[1]-4, h_bbox[2]+8, h_bbox[3]+4), fill="#262730", outline="yellow", width=1)
-                draw_history.text(h_text_pos, h_label, fill="yellow")
+                h_text_pos = (hx + 28, hy - 16)
+                h_bbox = draw_history.textbbox(h_text_pos, h_label, font=font_history)
+                draw_history.rectangle((h_bbox[0]-10, h_bbox[1]-6, h_bbox[2]+10, h_bbox[3]+6), fill="#262730", outline="yellow", width=2)
+                draw_history.text(h_text_pos, h_label, fill="yellow", font=font_history)
             except:
                 pass 
             
