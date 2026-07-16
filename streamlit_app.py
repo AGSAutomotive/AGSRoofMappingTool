@@ -374,6 +374,41 @@ with st.expander("🔒 History (Live Database Sync)", expanded=False):
     # Convert the dynamic fetched historical records to a DataFrame
     if plant_historical_records:
         hist_df = pd.DataFrame(plant_historical_records)
+        
+        # --- 🗺️ PLOT HISTORICAL COORDINATES ON THE ROOF MAP ---
+        hist_map_image = right_resized.copy()
+        draw_hist = ImageDraw.Draw(hist_map_image)
+        
+        for index, row in hist_df.iterrows():
+            try:
+                # Retrieve coordinates safely from database structure
+                db_x = row.get("CoordinateX")
+                db_y = row.get("CoordinateY")
+                label = str(row.get("Label", f"Leak {index + 1}"))
+                
+                if db_x is not None and db_y is not None:
+                    # Convert coordinates back from the 600px stored format to layout display width
+                    hist_x = int(float(db_x) * (DISPLAY_WIDTH / 600))
+                    hist_y = int(float(db_y) * (int(left_img.height * (DISPLAY_WIDTH / left_img.width)) / int(left_img.height * (600 / left_img.width))))
+                    
+                    # Draw pins matching exact style definitions
+                    draw_hist.ellipse((hist_x - 24, hist_y - 24, hist_x + 24, hist_y + 24), outline="cyan", width=4)
+                    draw_hist.ellipse((hist_x - 6, hist_y - 6, hist_x + 6, hist_y + 6), fill="red")
+                    
+                    text_pos = (hist_x + 30, hist_y - 10)
+                    bbox = draw_hist.textbbox(text_pos, label, font=font_floor)
+                    draw_hist.rectangle((bbox[0] - 5, bbox[1] - 3, bbox[2] + 5, bbox[3] + 3), fill="#1A1A1A", outline="cyan", width=2)
+                    draw_hist.text(text_pos, label, fill="cyan", font=font_floor)
+            except Exception as plot_err:
+                # Quietly skip parsing issues for malformed points
+                pass
+                
+        # Display the custom plotted map inside the expander
+        st.markdown("### 🦅 Historical Points Map")
+        st.image(hist_map_image)
+        
+        st.write("---")
+        st.markdown("### 📋 Database Records Table")
         st.dataframe(hist_df)
     else:
         st.info("The historical database is currently empty for this plant.")
