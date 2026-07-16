@@ -368,7 +368,6 @@ with st.expander("🔒 History (Live Database Sync)", expanded=False):
     plant_historical_records = []
     for r in historical_records:
         if str(r.get("Plant", "")).strip() == plant:
-            raw_date = r.get("DateNoticed", "")
             plant_historical_records.append(r)
 
     # Convert the dynamic fetched historical records to a DataFrame
@@ -400,15 +399,35 @@ with st.expander("🔒 History (Live Database Sync)", expanded=False):
                     draw_hist.rectangle((bbox[0] - 5, bbox[1] - 3, bbox[2] + 5, bbox[3] + 3), fill="#1A1A1A", outline="cyan", width=2)
                     draw_hist.text(text_pos, label, fill="cyan", font=font_floor)
             except Exception as plot_err:
-                # Quietly skip parsing issues for malformed points
                 pass
                 
-        # Display the custom plotted map inside the expander
-        st.markdown("### 🦅 Historical Points Map")
-        st.image(hist_map_image)
+        # --- Create Two Columns inside the Expander (Map Left, Table Right) ---
+        col_hist_left, col_hist_right = st.columns([4.0, 6.0])
         
-        st.write("---")
-        st.markdown("### 📋 Database Records Table")
-        st.dataframe(hist_df)
+        with col_hist_left:
+            st.markdown("### 🦅 Roof Points Map")
+            # Render a smaller, neat historical map (using layout width constraints inside column)
+            st.image(hist_map_image, use_container_width=True)
+            
+        with col_hist_right:
+            st.markdown("### 📋 Database Records")
+            
+            # Select, organize, and rename only the specific columns requested
+            # Columns selected: Label, DateNoticed, PrecipNoticed, PrecipBefore, ReporterEmail, Comments
+            col_mapping = {
+                "Label": "Label",
+                "DateNoticed": "Date Noticed",
+                "PrecipNoticed": "Precip. (Day)",
+                "PrecipBefore": "Precip. (Day Before)",
+                "ReporterEmail": "Reporter Email",
+                "Comments": "Comments"
+            }
+            
+            # Filter the dataframe safely matching columns that actually exist in your fetched data
+            existing_cols = [c for c in col_mapping.keys() if c in hist_df.columns]
+            filtered_df = hist_df[existing_cols].rename(columns=col_mapping)
+            
+            # Display clean table
+            st.dataframe(filtered_df, use_container_width=True, hide_index=True)
     else:
         st.info("The historical database is currently empty for this plant.")
