@@ -369,3 +369,11 @@ with st.expander("🔒 History (Live Database Sync)", expanded=False):
     for r in historical_records:
         if str(r.get("Plant", "")).strip() == plant:
             raw_date = r.get("DateNoticed", "")
+            plant_historical_records.append(r)
+
+    # Convert the dynamic fetched historical records to a DataFrame
+    if plant_historical_records:
+        hist_df = pd.DataFrame(plant_historical_records)
+        st.dataframe(hist_df)
+    else:
+        st.info("The historical database is currently empty for this plant.")
