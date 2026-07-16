@@ -19,7 +19,7 @@ EXCEL_FETCH_URL = "https://default9b2f9cbe865b4df8a5848494d8c1ef.f6.environment.
 
 st.set_page_config(page_title="AGS Roof Leak Master Mapper", layout="wide")
 st.title("🏭 AGS Roof Leak Tracking Tool")
-st.info("💡Select plant from the dropdown and enter your AGS email. Then click anywhere on the **floor map** image to plot a leak. Scroll down to to edit more details and submit a report.")
+st.info("💡Select plant from the dropdown and enter your AGS email. Then click anywhere on the **floor map** image to plot a leak. Scroll down to edit more details, attach photos, and submit a report.")
 
 # 1. User & Plant Info Inputs
 col_p1, col_p2 = st.columns([4.0, 6.0])
@@ -133,7 +133,9 @@ if click and click != st.session_state.get(f"lclick_{plant_key}"):
         'id': str(time.time()).replace(".", ""), 
         'serial': next_serial, 'x': click['x'], 'y': click['y'],
         'name': f"Leak Point {next_serial}", 'start_date': datetime.date.today(),
-        'comments': ""
+        'comments': "",
+        'photo1_name': "", 'photo1_base64': "",
+        'photo2_name': "", 'photo2_base64': ""
     })
     st.rerun()
 
@@ -148,19 +150,25 @@ st.subheader("📋 New Unreported Leaks")
 if not st.session_state["new_pins_batch"]:
     st.info("💡No new leaks plotted yet for this plant. Click on the floor map above to plot new leaks.")
 else:
-    st.info("💡**Click to rename or add details:** Customize the leak label, date, or add important comments below.")
+    st.info("💡**Click to rename or add details:** Customize the leak label, date, add comments, and upload up to two photos below.")
     
-    grid_header1, grid_header2, grid_header3, grid_header4, grid_header5, grid_header6, grid_header7 = st.columns([0.8, 1.8, 1.4, 1.8, 1.8, 2.2, 1.2])
+    # Rebalanced grid columns to support image upload inputs cleanly
+    grid_header1, grid_header2, grid_header3, grid_header4, grid_header5, grid_header6, grid_header7, grid_header8 = st.columns([0.6, 1.4, 1.2, 1.3, 1.3, 1.8, 1.8, 0.8])
     with grid_header3: st.markdown("**📅 Date Noticed**")
-    with grid_header4: st.markdown("**🌦️ Precipitation (Day Noticed)**")
-    with grid_header5: st.markdown("**🌦️ Precipitation (Day Before)**")
-    with grid_header6: st.markdown("**💬 Important Comments / Notes**")
+    with grid_header4: st.markdown("**🌦️ Precip. (Day)**")
+    with grid_header5: st.markdown("**🌦️ Precip. (Day Before)**")
+    with grid_header6: st.markdown("**💬 Comments / Notes**")
+    with grid_header7: st.markdown("**📸 Attach Photos (Max 2)**")
 
     for index, point in enumerate(st.session_state["new_pins_batch"]):
         if 'comments' not in point:
             st.session_state["new_pins_batch"][index]['comments'] = ""
+        if 'photo1_name' not in point: st.session_state["new_pins_batch"][index]['photo1_name'] = ""
+        if 'photo1_base64' not in point: st.session_state["new_pins_batch"][index]['photo1_base64'] = ""
+        if 'photo2_name' not in point: st.session_state["new_pins_batch"][index]['photo2_name'] = ""
+        if 'photo2_base64' not in point: st.session_state["new_pins_batch"][index]['photo2_base64'] = ""
             
-        c_idx, c_lbl, c_dt, c_w1, c_w2, c_cmt, c_del = st.columns([0.8, 1.8, 1.4, 1.8, 1.8, 2.2, 1.2])
+        c_idx, c_lbl, c_dt, c_w1, c_w2, c_cmt, c_photos, c_del = st.columns([0.6, 1.4, 1.2, 1.3, 1.3, 1.8, 1.8, 0.8])
         with c_idx: st.write(f"**#{point['serial']}**")
         with c_lbl:
             new_name = st.text_input("Rename:", value=point['name'], key=f"ren_{point['id']}", label_visibility="collapsed")
@@ -181,6 +189,40 @@ else:
             if new_comment != point['comments']:
                 st.session_state["new_pins_batch"][index]['comments'] = new_comment
                 st.rerun()
+
+        with c_photos:
+            uploaded_files = st.file_uploader("Upload photos:", type=["png", "jpg", "jpeg"], accept_multiple_files=True, key=f"photos_{point['id']}", label_visibility="collapsed")
+            if uploaded_files:
+                # Limit to maximum 2 photos
+                valid_files = uploaded_files[:2]
+                if len(uploaded_files) > 2:
+                    st.warning("⚠️ Only the first 2 photos will be stored.")
+                
+                # Encode file 1
+                if len(valid_files) >= 1:
+                    f1 = valid_files[0]
+                    f1_bytes = f1.getvalue()
+                    st.session_state["new_pins_batch"][index]['photo1_name'] = f1.name
+                    st.session_state["new_pins_batch"][index]['photo1_base64'] = base64.b64encode(f1_bytes).decode('utf-8')
+                else:
+                    st.session_state["new_pins_batch"][index]['photo1_name'] = ""
+                    st.session_state["new_pins_batch"][index]['photo1_base64'] = ""
+                
+                # Encode file 2
+                if len(valid_files) >= 2:
+                    f2 = valid_files[1]
+                    f2_bytes = f2.getvalue()
+                    st.session_state["new_pins_batch"][index]['photo2_name'] = f2.name
+                    st.session_state["new_pins_batch"][index]['photo2_base64'] = base64.b64encode(f2_bytes).decode('utf-8')
+                else:
+                    st.session_state["new_pins_batch"][index]['photo2_name'] = ""
+                    st.session_state["new_pins_batch"][index]['photo2_base64'] = ""
+            else:
+                # Clear references if files are removed
+                st.session_state["new_pins_batch"][index]['photo1_name'] = ""
+                st.session_state["new_pins_batch"][index]['photo1_base64'] = ""
+                st.session_state["new_pins_batch"][index]['photo2_name'] = ""
+                st.session_state["new_pins_batch"][index]['photo2_base64'] = ""
         
         with c_del:
             if st.button("🗑️ Remove", key=f"del_{point['id']}", use_container_width=True):
@@ -194,7 +236,7 @@ if st.session_state["new_pins_batch"]:
     if not is_email_valid:
         st.error("🛑 **Submission Locked:** You must enter a valid AGS Automotive email address above (`@agsautomotive.com`) before you can submit this leak report.")
     else:
-        st.info("💡Once all new leaks are plotted, click **'Report Leaks'** button below to save.")
+        st.info("💡Once all new leaks are plotted and configured, click the **'Report Leaks'** button below to submit.")
     
     st.markdown("""
         <style>
@@ -239,12 +281,22 @@ if st.session_state["new_pins_batch"]:
                         "PrecipBefore": get_real_weather_data(plant, c_date - datetime.timedelta(days=1)),
                         "CoordinateX": stored_x,
                         "CoordinateY": stored_y,
-                        "Comments": pt.get('comments', "").strip()
+                        "Comments": pt.get('comments', "").strip(),
+                        "Photo1_Name": pt.get('photo1_name', ""),
+                        "Photo1_Base64": pt.get('photo1_base64', ""),
+                        "Photo2_Name": pt.get('photo2_name', ""),
+                        "Photo2_Base64": pt.get('photo2_base64', "")
                     })
                 
                 raw_df = pd.DataFrame(leak_items_list)
-                email_df = raw_df.drop(columns=["Serial", "CoordinateX", "CoordinateY"], errors="ignore")
-                email_df.columns = ["Leak Description", "Date Noticed", "Precipitation (Day)", "Precipitation (Before)", "Comments / Actions Needed"]
+                email_df = raw_df.drop(columns=["Serial", "CoordinateX", "CoordinateY", "Photo1_Base64", "Photo2_Base64"], errors="ignore")
+                
+                # Dynamically represent attachment indicators in the email notification table
+                email_df['Photo 1'] = email_df['Photo1_Name'].apply(lambda x: "📎 Attached" if x else "None")
+                email_df['Photo 2'] = email_df['Photo2_Name'].apply(lambda x: "📎 Attached" if x else "None")
+                email_df = email_df.drop(columns=["Photo1_Name", "Photo2_Name"], errors="ignore")
+                
+                email_df.columns = ["Leak Description", "Date Noticed", "Precipitation (Day)", "Precipitation (Before)", "Comments / Actions", "Photo 1", "Photo 2"]
                 
                 html_table_body = email_df.to_html(index=False, classes="clean-notification-table", escape=False)
                 
@@ -317,55 +369,3 @@ with st.expander("🔒 History (Live Database Sync)", expanded=False):
     for r in historical_records:
         if str(r.get("Plant", "")).strip() == plant:
             raw_date = r.get("DateNoticed", "")
-            try:
-                if str(raw_date).isdigit() or isinstance(raw_date, (int, float)):
-                    serial_num = int(float(raw_date))
-                    converted_dt = datetime.date(1899, 12, 30) + datetime.timedelta(days=serial_num)
-                    r["DateNoticed"] = converted_dt.strftime("%Y/%m/%d")
-            except Exception:
-                pass
-            plant_historical_records.append(r)
-
-    if not plant_historical_records:
-        st.info("🍃 The historical database is currently empty.")
-    else:
-        st.caption(f"Showing {len(plant_historical_records)} historical leak points.")
-        
-        history_canvas = right_resized.copy()
-        draw_history = ImageDraw.Draw(history_canvas)
-        
-        for record in plant_historical_records:
-            try:
-                hx = int(float(record["CoordinateX"]) * (DISPLAY_WIDTH / 600))
-                hy = int(float(record["CoordinateY"]) * (int(right_img.height * (DISPLAY_WIDTH / right_img.width)) / int(right_img.height * (600 / right_img.width))))
-                h_label = str(record.get("Label", "Unlabeled Point"))
-                
-                draw_history.ellipse((hx-20, hy-20, hx+20, hy+20), outline="yellow", width=4)
-                draw_history.ellipse((hx-6, hy-6, hx+6, hy+6), fill="orange")
-                
-                h_text_pos = (hx + 26, hy - 12)
-                h_bbox = draw_history.textbbox(h_text_pos, h_label, font=font_history)
-                draw_history.rectangle((h_bbox[0]-7, h_bbox[1]-4, h_bbox[2]+7, h_bbox[3]+4), fill="#262730", outline="yellow", width=2)
-                draw_history.text(h_text_pos, h_label, fill="yellow", font=font_history)
-            except:
-                pass 
-            
-        hist_col1, hist_col2 = st.columns([6.0, 4.0])
-        with hist_col1:
-            st.image(history_canvas, use_container_width=False, caption="Live Cumulative Database History View")
-        with hist_col2:
-            try:
-                df_view = pd.DataFrame(plant_historical_records)
-                
-                if "Comments" not in df_view.columns:
-                    df_view["Comments"] = ""
-                    
-                if "ReporterEmail" not in df_view.columns:
-                    df_view["ReporterEmail"] = "N/A"
-                
-                df_view = df_view[["Label", "DateNoticed", "ReporterEmail", "PrecipNoticed", "Comments"]]
-                df_view.columns = ["Leak Description", "Date Noticed", "Submitted By", "Precipitation", "Comments / Notes"]
-                
-                st.dataframe(df_view, use_container_width=True, hide_index=True)
-            except Exception as table_err:
-                st.caption("Unable to format history grid columns. Raw attributes might be initializing.")
