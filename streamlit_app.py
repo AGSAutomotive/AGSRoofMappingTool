@@ -373,24 +373,39 @@ with st.expander("🔒 History (Live Database Sync)", expanded=False):
     # Convert the dynamic fetched historical records to a DataFrame
     if plant_historical_records:
         hist_df = pd.DataFrame(plant_historical_records)
-
         # --- 🔧 DATE FORMAT FIX BLOCK ---
-        # Ensures that if "DateNoticed" is loaded as an epoch code or raw string, it gets cleaned up
+        # Handles raw Excel serial numbers (e.g., 45431), numeric epochs, and standard strings
         if "DateNoticed" in hist_df.columns:
             try:
-                # Handle numeric codes (milliseconds/seconds) safely first
-                if pd.api.types.is_numeric_dtype(hist_df["DateNoticed"]):
-                    # If it's a giant epoch number, convert from ms
-                    hist_df["DateNoticed"] = pd.to_datetime(hist_df["DateNoticed"], unit='ms', errors='coerce')
-                else:
-                    hist_df["DateNoticed"] = pd.to_datetime(hist_df["DateNoticed"], errors='coerce')
-                
-                # Convert back to a clean, formatted YYYY-MM-DD string representation
-                hist_df["DateNoticed"] = hist_df["DateNoticed"].dt.strftime('%Y-%m-%d').fillna("N/A")
+                def parse_excel_date(val):
+                    if pd.isna(val) or str(val).strip() == "":
+                        return "N/A"
+                    try:
+                        # Convert to numeric to check if it's an Excel serial date
+                        num_val = float(val)
+                        # Excel dates in the 2000s-2020s typically fall between 35000 and 60000
+                        if 30000 < num_val < 60000:
+                            return (pd.to_datetime("1899-12-30") + pd.to_timedelta(num_val, unit="D")).strftime('%Y-%m-%d')
+                        # If it's a giant Unix timestamp code instead
+                        elif num_val > 1000000000:
+                            return pd.to_datetime(num_val, unit='ms' if num_val > 100000000000 else 's', errors='coerce').strftime('%Y-%m-%d')
+                    except (ValueError, TypeError):
+                        pass
+                    
+                    # Fallback to standard string date parsing if it's not a raw number
+                    try:
+                        parsed_dt = pd.to_datetime(val, errors='coerce')
+                        if pd.notna(parsed_dt):
+                            return parsed_dt.strftime('%Y-%m-%d')
+                    except:
+                        pass
+                    
+                    return str(val)
+
+                hist_df["DateNoticed"] = hist_df["DateNoticed"].apply(parse_excel_date)
             except Exception as dt_err:
-                # Fallback if anything goes unexpected to prevent crash
-                hist_df["DateNoticed"] = hist_df["DateNoticed"].astype(str)        
-        
+                hist_df["DateNoticed"] = hist_df["DateNoticed"].astype(str)
+           
         # --- 🗺️ PLOT HISTORICAL COORDINATES ON THE ROOF MAP ---
         hist_map_image = right_resized.copy()
         draw_hist = ImageDraw.Draw(hist_map_image)
