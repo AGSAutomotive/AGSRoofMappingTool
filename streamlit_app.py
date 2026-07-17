@@ -373,6 +373,23 @@ with st.expander("🔒 History (Live Database Sync)", expanded=False):
     # Convert the dynamic fetched historical records to a DataFrame
     if plant_historical_records:
         hist_df = pd.DataFrame(plant_historical_records)
+
+        # --- 🔧 DATE FORMAT FIX BLOCK ---
+        # Ensures that if "DateNoticed" is loaded as an epoch code or raw string, it gets cleaned up
+        if "DateNoticed" in hist_df.columns:
+            try:
+                # Handle numeric codes (milliseconds/seconds) safely first
+                if pd.api.types.is_numeric_dtype(hist_df["DateNoticed"]):
+                    # If it's a giant epoch number, convert from ms
+                    hist_df["DateNoticed"] = pd.to_datetime(hist_df["DateNoticed"], unit='ms', errors='coerce')
+                else:
+                    hist_df["DateNoticed"] = pd.to_datetime(hist_df["DateNoticed"], errors='coerce')
+                
+                # Convert back to a clean, formatted YYYY-MM-DD string representation
+                hist_df["DateNoticed"] = hist_df["DateNoticed"].dt.strftime('%Y-%m-%d').fillna("N/A")
+            except Exception as dt_err:
+                # Fallback if anything goes unexpected to prevent crash
+                hist_df["DateNoticed"] = hist_df["DateNoticed"].astype(str)        
         
         # --- 🗺️ PLOT HISTORICAL COORDINATES ON THE ROOF MAP ---
         hist_map_image = right_resized.copy()
