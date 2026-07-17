@@ -321,8 +321,8 @@ if st.session_state["new_pins_batch"]:
                 email_df = raw_df.drop(columns=["Serial", "CoordinateX", "CoordinateY", "Photo1_Base64", "Photo2_Base64"], errors="ignore")
                 
                 # Dynamically represent attachment indicators in the email notification table
-                email_df['Photo 1'] = email_df['Photo1_Name'].apply(lambda x: "📎 Attached in Roof Leaks MASTER" if x else "None")
-                email_df['Photo 2'] = email_df['Photo2_Name'].apply(lambda x: "📎 Attached in Roof Leaks MASTER" if x else "None")
+                email_df['Photo 1'] = email_df['Photo1_Name'].apply(lambda x: "📎 Attached" if x else "None")
+                email_df['Photo 2'] = email_df['Photo2_Name'].apply(lambda x: "📎 Attached" if x else "None")
                 email_df = email_df.drop(columns=["Photo1_Name", "Photo2_Name"], errors="ignore")
                 
                 email_df.columns = ["Leak Description", "Date Noticed", "Precipitation (Day)", "Precipitation (Before)", "Comments / Actions", "Photo 1", "Photo 2"]
