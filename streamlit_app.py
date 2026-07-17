@@ -405,7 +405,6 @@ with st.expander("🔒 History (Live Database Sync)", expanded=False):
         col_hist_left, col_hist_right = st.columns([4.0, 6.0])
         
         with col_hist_left:
-            st.markdown("### 🦅 Roof Points Map")
             # Render a smaller, neat historical map (using layout width constraints inside column)
             st.image(hist_map_image, use_container_width=True)
             
