@@ -404,7 +404,7 @@ with st.expander("🔒 History (Live Database Sync)", expanded=False):
     if plant_historical_records:
         hist_df = pd.DataFrame(plant_historical_records)
        
-       # --- 🔧 DATE FORMAT FIX BLOCK ---
+        # --- 🔧 DATE FORMAT FIX BLOCK ---
         # Handles raw Excel serial numbers (e.g., 45431), numeric epochs, and standard strings
         if "DateNoticed" in hist_df.columns:
             try:
@@ -475,7 +475,6 @@ with st.expander("🔒 History (Live Database Sync)", expanded=False):
             st.markdown("### 📋 Database Records")
             
             # Select, organize, and rename only the specific columns requested
-            # Columns selected: Label, DateNoticed, PrecipNoticed, PrecipBefore, ReporterEmail, Comments
             col_mapping = {
                 "Label": "Label",
                 "DateNoticed": "Date Noticed",
