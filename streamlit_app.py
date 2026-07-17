@@ -373,8 +373,9 @@ with st.expander("🔒 History (Live Database Sync)", expanded=False):
     # Convert the dynamic fetched historical records to a DataFrame
     if plant_historical_records:
         hist_df = pd.DataFrame(plant_historical_records)
+       
         # --- 🔧 DATE FORMAT FIX BLOCK ---
-        # Handles raw Excel serial numbers (e.g., 45431), numeric epochs, and standard strings
+        # Adjusted with a 5-day calibration offset to align server serial logs to true dates
         if "DateNoticed" in hist_df.columns:
             try:
                 def parse_excel_date(val):
@@ -385,7 +386,8 @@ with st.expander("🔒 History (Live Database Sync)", expanded=False):
                         num_val = float(val)
                         # Excel dates in the 2000s-2020s typically fall between 35000 and 60000
                         if 30000 < num_val < 60000:
-                            return (pd.to_datetime("1899-12-30") + pd.to_timedelta(num_val, unit="D")).strftime('%Y-%m-%d')
+                            # Shifted base to 1899-12-25 to correct the 5-day offset discrepancy
+                            return (pd.to_datetime("1899-12-25") + pd.to_timedelta(num_val, unit="D")).strftime('%Y-%m-%d')
                         # If it's a giant Unix timestamp code instead
                         elif num_val > 1000000000:
                             return pd.to_datetime(num_val, unit='ms' if num_val > 100000000000 else 's', errors='coerce').strftime('%Y-%m-%d')
@@ -405,7 +407,8 @@ with st.expander("🔒 History (Live Database Sync)", expanded=False):
                 hist_df["DateNoticed"] = hist_df["DateNoticed"].apply(parse_excel_date)
             except Exception as dt_err:
                 hist_df["DateNoticed"] = hist_df["DateNoticed"].astype(str)
-           
+
+    
         # --- 🗺️ PLOT HISTORICAL COORDINATES ON THE ROOF MAP ---
         hist_map_image = right_resized.copy()
         draw_hist = ImageDraw.Draw(hist_map_image)
