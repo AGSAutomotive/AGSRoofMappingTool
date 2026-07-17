@@ -134,8 +134,8 @@ if click and click != st.session_state.get(f"lclick_{plant_key}"):
         'serial': next_serial, 'x': click['x'], 'y': click['y'],
         'name': f"Leak Point {next_serial}", 'start_date': datetime.date.today(),
         'comments': "",
-        'photo1_name': "", 'photo1_base64': "",
-        'photo2_name': "", 'photo2_base64': ""
+        'photo1_name': "", 'photo1_base64': "", 'photo1_ext': "",
+        'photo2_name': "", 'photo2_base64': "", 'photo2_ext': ""
     })
     st.rerun()
 
@@ -165,8 +165,10 @@ else:
             st.session_state["new_pins_batch"][index]['comments'] = ""
         if 'photo1_name' not in point: st.session_state["new_pins_batch"][index]['photo1_name'] = ""
         if 'photo1_base64' not in point: st.session_state["new_pins_batch"][index]['photo1_base64'] = ""
+        if 'photo1_ext' not in point: st.session_state["new_pins_batch"][index]['photo1_ext'] = ""
         if 'photo2_name' not in point: st.session_state["new_pins_batch"][index]['photo2_name'] = ""
         if 'photo2_base64' not in point: st.session_state["new_pins_batch"][index]['photo2_base64'] = ""
+        if 'photo2_ext' not in point: st.session_state["new_pins_batch"][index]['photo2_ext'] = ""
             
         c_idx, c_lbl, c_dt, c_w1, c_w2, c_cmt, c_photos, c_del = st.columns([0.6, 1.4, 1.2, 1.3, 1.3, 1.8, 1.8, 0.8])
         with c_idx: st.write(f"**#{point['serial']}**")
@@ -202,26 +204,34 @@ else:
                 if len(valid_files) >= 1:
                     f1 = valid_files[0]
                     f1_bytes = f1.getvalue()
+                    ext1 = f1.name.split('.')[-1] if '.' in f1.name else 'jpg'
                     st.session_state["new_pins_batch"][index]['photo1_name'] = f1.name
+                    st.session_state["new_pins_batch"][index]['photo1_ext'] = ext1
                     st.session_state["new_pins_batch"][index]['photo1_base64'] = base64.b64encode(f1_bytes).decode('utf-8')
                 else:
                     st.session_state["new_pins_batch"][index]['photo1_name'] = ""
+                    st.session_state["new_pins_batch"][index]['photo1_ext'] = ""
                     st.session_state["new_pins_batch"][index]['photo1_base64'] = ""
                 
                 # Encode file 2
                 if len(valid_files) >= 2:
                     f2 = valid_files[1]
                     f2_bytes = f2.getvalue()
+                    ext2 = f2.name.split('.')[-1] if '.' in f2.name else 'jpg'
                     st.session_state["new_pins_batch"][index]['photo2_name'] = f2.name
+                    st.session_state["new_pins_batch"][index]['photo2_ext'] = ext2
                     st.session_state["new_pins_batch"][index]['photo2_base64'] = base64.b64encode(f2_bytes).decode('utf-8')
                 else:
                     st.session_state["new_pins_batch"][index]['photo2_name'] = ""
+                    st.session_state["new_pins_batch"][index]['photo2_ext'] = ""
                     st.session_state["new_pins_batch"][index]['photo2_base64'] = ""
             else:
                 # Clear references if files are removed
                 st.session_state["new_pins_batch"][index]['photo1_name'] = ""
+                st.session_state["new_pins_batch"][index]['photo1_ext'] = ""
                 st.session_state["new_pins_batch"][index]['photo1_base64'] = ""
                 st.session_state["new_pins_batch"][index]['photo2_name'] = ""
+                st.session_state["new_pins_batch"][index]['photo2_ext'] = ""
                 st.session_state["new_pins_batch"][index]['photo2_base64'] = ""
         
         with c_del:
@@ -267,15 +277,18 @@ if st.session_state["new_pins_batch"]:
                 target_cell = grid_positions.get(plant_key, "A2")
                 
                 leak_items_list = []
+                email_attachments_list = []
+                
                 for pt in st.session_state["new_pins_batch"]:
                     c_date = pt['start_date']
+                    lbl_name = pt['name']
                     
                     stored_x = int(pt['x'] * (600 / DISPLAY_WIDTH))
                     stored_y = int(pt['y'] * (int(left_img.height * (600 / left_img.width)) / int(left_img.height * (DISPLAY_WIDTH / left_img.width))))
                     
                     leak_items_list.append({
                         "Serial": int(pt['serial']),
-                        "Label": pt['name'],
+                        "Label": lbl_name,
                         "DateNoticed": c_date.strftime("%Y-%m-%d"),
                         "PrecipNoticed": get_real_weather_data(plant, c_date),
                         "PrecipBefore": get_real_weather_data(plant, c_date - datetime.timedelta(days=1)),
@@ -287,6 +300,22 @@ if st.session_state["new_pins_batch"]:
                         "Photo2_Name": pt.get('photo2_name', ""),
                         "Photo2_Base64": pt.get('photo2_base64', "")
                     })
+                    
+                    # Package Photo 1 as an explicit top-level attachment array item
+                    if pt.get('photo1_base64'):
+                        p1_ext = pt.get('photo1_ext', 'jpg')
+                        email_attachments_list.append({
+                            "Name": f"{lbl_name} - Photo1.{p1_ext}",
+                            "ContentBytes": pt['photo1_base64']
+                        })
+                        
+                    # Package Photo 2 as an explicit top-level attachment array item
+                    if pt.get('photo2_base64'):
+                        p2_ext = pt.get('photo2_ext', 'jpg')
+                        email_attachments_list.append({
+                            "Name": f"{lbl_name} - Photo2.{p2_ext}",
+                            "ContentBytes": pt['photo2_base64']
+                        })
                 
                 raw_df = pd.DataFrame(leak_items_list)
                 email_df = raw_df.drop(columns=["Serial", "CoordinateX", "CoordinateY", "Photo1_Base64", "Photo2_Base64"], errors="ignore")
@@ -338,7 +367,8 @@ if st.session_state["new_pins_batch"]:
                     "DashboardCell": target_cell,
                     "Base64MapData": base64_string,
                     "LeaksArray": leak_items_list,       
-                    "EmailTableHTML": styled_email_table 
+                    "EmailTableHTML": styled_email_table,
+                    "EmailAttachments": email_attachments_list
                 }
                 
                 requests.post(POWER_AUTOMATE_URL, json=master_payload)
