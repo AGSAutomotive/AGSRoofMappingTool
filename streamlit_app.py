@@ -430,4 +430,4 @@ with st.expander("🔒 History (Live Database Sync)", expanded=False):
             # Display clean table
             st.dataframe(filtered_df, use_container_width=True, hide_index=True)
     else:
-        st.info("The historical database is currently empty for this plant.")
+        st.info("🍃 The historical database is currently empty for this plant.")
