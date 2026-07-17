@@ -382,7 +382,7 @@ if st.session_state["new_pins_batch"]:
 # 🔒 DYNAMIC HISTORICAL MAP ENGINE (Renders at Very Bottom)
 # ------------------------------------------------------------------
 st.write("---")
-with st.expander("🔒 History (Live Database Sync)", expanded=False):
+with st.expander("🔒 History (Live Database Sync)", expanded=True):
     st.subheader(f"📊 Historical Leak Records — {plant}")
     
     historical_records = []
