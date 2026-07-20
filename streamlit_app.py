@@ -41,7 +41,7 @@ def get_real_weather_data(plant_name, target_date):
     coordinates = {
         'Cambridge - 07': {"lat": 43.403449, "lon": -80.322832},
         'Oshawa - 04': {"lat": 43.876437, "lon": -78.848991},
-        'Sterling 18.5': {"lat": 42.542228, "lon": -83.041669},
+        'Sterling 18.5': {"lat": 42.600697, "lon": -83.043900},
         'Sterling South': {"lat": 42.542228, "lon": -83.041669},
         'Windsor - 02': {"lat": 42.286758, "lon": -83.016596}
     }
