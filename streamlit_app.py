@@ -24,8 +24,8 @@ st.info("💡Select plant from the dropdown and enter your AGS email. Then click
 # 1. User & Plant Info Inputs
 col_p1, col_p2 = st.columns([4.0, 6.0])
 with col_p1:
-    plant = st.selectbox("Select Plant:", ['Cambridge - 07', 'Oshawa - 04', 'Sterling South', 'Windsor - 02'])
-    plant_key = plant.replace(' ', '_').replace('-', '_')
+    plant = st.selectbox("Select Plant:", ['Cambridge - 07', 'Oshawa - 04', 'Sterling 18.5', 'Sterling South', 'Windsor - 02'])
+    plant_key = plant.replace(' ', '_').replace('-', '_').replace('.', '_')
 with col_p2:
     user_email = st.text_input("📋 Enter your AGS Automotive Email:", placeholder="username@agsautomotive.com").strip().lower()
 
@@ -41,6 +41,7 @@ def get_real_weather_data(plant_name, target_date):
     coordinates = {
         'Cambridge - 07': {"lat": 43.403449, "lon": -80.322832},
         'Oshawa - 04': {"lat": 43.876437, "lon": -78.848991},
+        'Sterling 18.5': {"lat": 42.542228, "lon": -83.041669},
         'Sterling South': {"lat": 42.542228, "lon": -83.041669},
         'Windsor - 02': {"lat": 42.286758, "lon": -83.016596}
     }
@@ -66,6 +67,8 @@ try:
         left_path, right_path = "data/CambridgeCAD.png", "data/Cambridge.png"
     elif "Oshawa" in plant:
         left_path, right_path = "data/OshawaCAD.png", "data/Oshawa.png"
+    elif plant == "Sterling 18.5":
+        left_path, right_path = "data/Sterling18.5CAD.png", "data/Sterling18.5.png"
     elif "Sterling" in plant:
         left_path, right_path = "data/SterlingSouthCAD.png", "data/SterlingSouth.png"
     else:
@@ -273,7 +276,7 @@ if st.session_state["new_pins_batch"]:
                 
                 local_timestamp = datetime.datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d %H:%M:%S")
                 
-                grid_positions = {'Cambridge___07': "A2", 'Oshawa___04': "M2", 'Sterling_South': "AK2", 'Windsor___02': "Y2"}
+                grid_positions = {'Cambridge___07': "A2", 'Oshawa___04': "M2", 'Sterling_18_5': "AW2", 'Sterling_South': "AK2", 'Windsor___02': "Y2"}
                 target_cell = grid_positions.get(plant_key, "A2")
                 
                 leak_items_list = []
@@ -403,7 +406,7 @@ with st.expander("🔒 History (Live Database Sync)", expanded=True):
     # Convert the dynamic fetched historical records to a DataFrame
     if plant_historical_records:
         hist_df = pd.DataFrame(plant_historical_records)
-       
+        
         # --- 🔧 DATE FORMAT FIX BLOCK ---
         # Handles raw Excel serial numbers (e.g., 45431), numeric epochs, and standard strings
         if "DateNoticed" in hist_df.columns:
