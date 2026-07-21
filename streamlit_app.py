@@ -328,7 +328,7 @@ if st.session_state["new_pins_batch"]:
                 email_df['Photo 2'] = email_df['Photo2_Name'].apply(lambda x: "📎 Attached" if x else "None")
                 email_df = email_df.drop(columns=["Photo1_Name", "Photo2_Name"], errors="ignore")
                 
-                email_df.columns = ["Leak Description", "Date Noticed", "Precipitation (Day)", "Precipitation (Before)", "Comments / Actions", "Photo 1", "Photo 2"]
+                email_df.columns = ["Leak Title", "Date Noticed", "Comments", "Photo 1", "Photo 2"]
                 
                 html_table_body = email_df.to_html(index=False, classes="clean-notification-table", escape=False)
                 
@@ -475,7 +475,7 @@ with st.expander("🔒 History (Live Database Sync)", expanded=True):
             st.image(hist_map_image, use_container_width=True)
             
         with col_hist_right:
-            st.markdown("### 📋 Historical Database Records")
+            st.markdown("### 📋 Historical Records:")
             
             # Select, organize, and rename only the specific columns requested
             col_mapping = {
