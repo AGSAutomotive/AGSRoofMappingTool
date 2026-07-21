@@ -475,7 +475,7 @@ with st.expander("🔒 History (Live Database Sync)", expanded=True):
             st.image(hist_map_image, use_container_width=True)
             
         with col_hist_right:
-            st.markdown("### 📋 Database Records")
+            st.markdown("### 📋 Historical Database Records")
             
             # Select, organize, and rename only the specific columns requested
             col_mapping = {
@@ -494,4 +494,4 @@ with st.expander("🔒 History (Live Database Sync)", expanded=True):
             # Display clean table
             st.dataframe(filtered_df, use_container_width=True, hide_index=True)
     else:
-        st.info("🍃 The historical database is currently empty for this plant.")
+        st.info("🍃 The historical database for this plant is currently empty.")
