@@ -321,14 +321,17 @@ if st.session_state["new_pins_batch"]:
                         })
                 
                 raw_df = pd.DataFrame(leak_items_list)
-                email_df = raw_df.drop(columns=["Serial", "CoordinateX", "CoordinateY", "Photo1_Base64", "Photo2_Base64"], errors="ignore")
+                
+                # Exclude internal metadata AND precipitation columns from the email summary table
+                email_df = raw_df.drop(columns=["Serial", "CoordinateX", "CoordinateY", "PrecipNoticed", "PrecipBefore", "Photo1_Base64", "Photo2_Base64"], errors="ignore")
                 
                 # Dynamically represent attachment indicators in the email notification table
                 email_df['Photo 1'] = email_df['Photo1_Name'].apply(lambda x: "📎 Attached" if x else "None")
                 email_df['Photo 2'] = email_df['Photo2_Name'].apply(lambda x: "📎 Attached" if x else "None")
                 email_df = email_df.drop(columns=["Photo1_Name", "Photo2_Name"], errors="ignore")
                 
-                email_df.columns = ["Leak Title", "Date Noticed", "Comments", "Photo 1", "Photo 2"]
+                # Explicit 5-column layout for the email table
+                email_df.columns = ["Leak Description", "Date Noticed", "Comments / Actions", "Photo 1", "Photo 2"]
                 
                 html_table_body = email_df.to_html(index=False, classes="clean-notification-table", escape=False)
                 
@@ -338,7 +341,7 @@ if st.session_state["new_pins_batch"]:
                         border-collapse: collapse;
                         width: 100%;
                         font-family: Calibri, Arial, sans-serif;
-                        font-size: 14px;
+                        font-size: 16px;
                         margin: 16px 0;
                     }}
                     .clean-notification-table th {{
